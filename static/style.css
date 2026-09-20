@@ -692,14 +692,23 @@ a:hover { color: var(--accent); }
   width: 100%;
   padding: 10px 14px;
   background: none;
-  border: 1px solid var(--line, #ddd);
+  border: none;
   border-radius: 10px;
   cursor: pointer;
   font: inherit;
   color: inherit;
   text-align: left;
 }
-.level-block .block-head:hover { border-color: var(--ink, #333); }
+.level-block .block-head:hover { background: var(--paper-2, #f3f1eb); }
+/* 手绘风层图标 — 笔绘描边,颜色跟随各层主题色 */
+.level-block .lv-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.level-block.lv-b1 .lv-icon { color: var(--b1); transform: rotate(-2deg); }
+.level-block.lv-b2 .lv-icon { color: var(--b2); transform: rotate(1.5deg); }
+.level-block.lv-c1 .lv-icon { color: var(--c1); transform: rotate(-1deg); }
 .level-block .block-title { font-weight: 600; }
 .level-block .block-caret {
   margin-left: auto;
