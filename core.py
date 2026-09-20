@@ -403,21 +403,34 @@ def write_index_landing(out_dir: Path, issues: list[dict]) -> None:
 
 
 _JUNK_PATTERNS = [
-    # News in Levels 每篇文章都带的站点推广样板文 — 不是正文
+    # News in Levels 全站推广/使用说明样板段 — 不是正文
     re.compile(r"do you want to learn english", re.I),
     re.compile(r"we have a special book for you", re.I),
+    re.compile(r"news in levels is designed", re.I),
+    re.compile(r"do the test at", re.I),
+    re.compile(r"go to your level", re.I),
+    re.compile(r"read two news articles", re.I),
+    re.compile(r"watch the original video", re.I),
+    re.compile(r"listen to the news from today", re.I),
+    re.compile(r"follow the instructions below", re.I),
     # 嵌入播放器残留
     re.compile(r"embed embed\b", re.I),
+    re.compile(r"<iframe", re.I),
 ]
 
 def _filter_junk(records: list[dict]) -> list[dict]:
-    """删掉没有阅读价值的文章:站点推广样板文、嵌入播放器乱码简介。"""
+    """删掉没有阅读价值的文章;可救的文章只剥掉样板段落。"""
     out = []
     for r in records:
-        text = (r.get("deck") or "") + " " + (r.get("body") or "")[:500]
-        if any(p.search(text) for p in _JUNK_PATTERNS):
+        body = r.get("body") or ""
+        paras = [p for p in re.split(r"\n\s*\n", body) if p.strip()]
+        clean = [p for p in paras
+                 if not any(pat.search(p) for pat in _JUNK_PATTERNS)]
+        cleaned = "\n\n".join(clean).strip()
+        if len(cleaned) < 400:
             log.info("junk dropped: %s (%s)", r.get("title", "")[:50], r.get("source", ""))
             continue
+        r["body"] = cleaned
         out.append(r)
     return out
 

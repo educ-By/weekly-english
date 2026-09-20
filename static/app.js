@@ -311,7 +311,11 @@
           }),
         });
         const data = await r.json();
+        // 聊开后:面板保持展开,输出区平滑滚入视野
+        const panel = mount.querySelector(".ask-panel");
+        if (panel) panel.open = true;
         out.textContent = data.content || "(no answer)";
+        out.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
         const used = data.usage_tokens || 0;
         let total = parseInt(localStorage.getItem("we_ask_tokens") || "0", 10) + used;
@@ -486,8 +490,15 @@
         if (r.ok) {
           btn.textContent = data.updated ? "Updated" : "Added ✓";
           btn.classList.add("is-added");
+        } else if (r.status === 401) {
+          // 登录过期 — 清掉旧 token,按钮变成重新登录入口
+          localStorage.removeItem("we_token");
+          btn.removeAttribute("data-add-vocab");
+          btn.disabled = false;
+          btn.textContent = "Sign in again →";
+          btn.addEventListener("click", () => { location.href = "/auth/login"; });
         } else {
-          btn.textContent = "Failed";
+          btn.textContent = "Failed (" + r.status + ")";
           btn.disabled = false;
         }
       } catch (err) {

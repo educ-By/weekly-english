@@ -115,6 +115,36 @@ class WordGloss(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class TokenUsage(Base):
+    """每月 AI token 用量(按 provider 分计)。"""
+    __tablename__ = "token_usage"
+    id = Column(Integer, primary_key=True)
+    provider = Column(String(32), nullable=False)   # glm / deepseek
+    month = Column(String(7), nullable=False)       # 2026-09
+    tokens = Column(Integer, default=0)
+    __table_args__ = (UniqueConstraint("provider", "month", name="uq_usage_month"),)
+
+
+def add_usage(provider: str, tokens: int):
+    if not tokens:
+        return
+    month = datetime.utcnow().strftime("%Y-%m")
+    with get_session_local()() as ses:
+        row = ses.query(TokenUsage).filter_by(provider=provider, month=month).first()
+        if row:
+            row.tokens = (row.tokens or 0) + tokens
+        else:
+            ses.add(TokenUsage(provider=provider, month=month, tokens=tokens))
+        ses.commit()
+
+
+def get_month_usage(provider: str) -> int:
+    month = datetime.utcnow().strftime("%Y-%m")
+    with get_session_local()() as ses:
+        row = ses.query(TokenUsage).filter_by(provider=provider, month=month).first()
+        return (row.tokens or 0) if row else 0
+
+
 def get_shared_gloss(cache_key: str):
     """命中返回 dict,未命中返回 None;命中时 hits+1。"""
     with get_session_local()() as ses:

@@ -205,13 +205,15 @@ def lookup_word(word: str,
                 data = _json.loads(m.group(0))
             except Exception:
                 data = {}
+        usage = getattr(resp, "usage", None)
         info = {"ok": True, "word": word,
                 "phonetic": (data.get("phonetic") or "") if isinstance(data, dict) else "",
                 "definition_en": "",
                 "translation": (data.get("zh") or data.get("translation") or text[:60]),
                 "examples": [],
                 "cefr_level": "",
-                "model": cfg["model"]}
+                "model": cfg["model"],
+                "usage_tokens": getattr(usage, "total_tokens", 0) or 0}
         if len(_lookup_cache) > 800:
             _lookup_cache.clear()
         _lookup_cache[ck] = info

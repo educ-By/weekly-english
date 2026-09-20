@@ -154,8 +154,48 @@ def api_issues():
     return {"issues": core.scan_issues(OUT_DIR)}
 
 
+# ---------- AI 月度配额(每模型各 50 万 tokens;开发者账户不限) ----------
+AI_MONTHLY_TOKEN_LIMIT = int(os.environ.get("AI_MONTHLY_TOKEN_LIMIT", "500000"))
+DEVELOPER_EMAIL = os.environ.get("DEVELOPER_EMAIL", "1607045457@qq.com")
+
+
+def _request_email(request: Request) -> str | None:
+    """从请求的 Bearer token 解出登录邮箱;未登录返回 None。"""
+    authz = request.headers.get("authorization") or ""
+    if not authz.lower().startswith("bearer "):
+        return None
+    try:
+        uid = auth.decode_token(authz[7:].strip())
+        if not uid:
+            return None
+        with db.get_session_local()() as ses:
+            u = ses.get(db.User, int(uid))
+            return (u.email if u else None)
+    except Exception:
+        return None
+
+
+def _quota_exceeded(provider: str, request: Request | None = None) -> bool:
+    if request is not None and _request_email(request) == DEVELOPER_EMAIL:
+        return False   # 开发者账户无视限制
+    try:
+        return db.get_month_usage(provider) >= AI_MONTHLY_TOKEN_LIMIT
+    except Exception:
+        return False
+
+
+def _record_usage(provider: str, tokens: int, request: Request | None = None):
+    if request is not None and _request_email(request) == DEVELOPER_EMAIL:
+        return
+    try:
+        db.add_usage(provider, tokens)
+    except Exception as e:
+        log.warning("usage record failed: %s", e)
+
+
 @app.get("/api/dict")
-def api_dict(word: str = Query(..., min_length=1),
+def api_dict(request: Request,
+             word: str = Query(..., min_length=1),
              sentence: str | None = Query(None)):
     """单词速查:云端共享词典(所有用户共用一份) → 未命中才调 LLM 并入库。"""
     word = word.strip().lower()
@@ -169,8 +209,12 @@ def api_dict(word: str = Query(..., min_length=1),
             return shared
     except Exception as e:
         log.warning("shared gloss read failed: %s", e)
+    if _quota_exceeded("glm", request):
+        return {"ok": False, "word": word,
+                "translation": "本月 AI 额度已用完,下月自动恢复。"}
     info = deepseek_client.lookup_word(word, sentence_context=sentence)
     if info.get("ok"):
+        _record_usage("glm", info.get("usage_tokens") or 0, request)
         try:
             db.save_shared_gloss(ck, word, info, model=info.get("model") or "")
         except Exception as e:
@@ -185,9 +229,12 @@ async def api_ask(request: Request):
     question = (body.get("question") or "").strip()
     if not question:
         raise HTTPException(400, "question is required")
+    if _quota_exceeded("deepseek", request):
+        return {"ok": False, "refused": False, "content": "本月 AI 额度已用完,下月自动恢复。"}
     issue_key = body.get("issue_key") or _latest_issue_key()
     articles = _load_articles_context(issue_key) if issue_key else []
     info = deepseek_client.ask(question, context_articles=articles)
+    _record_usage("deepseek", info.get("usage_tokens") or 0, request)
     return info
 
 
