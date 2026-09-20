@@ -306,7 +306,7 @@
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             question: q,
-            issue_key: (location.pathname.match(/article-\d{4}-W\d{2}-(.+)\//) || [])[1]
+            issue_key: (location.pathname.match(/(\d{4}-W\d{2})/) || [])[1]
                        || document.body.dataset.issueKey || "",
           }),
         });
