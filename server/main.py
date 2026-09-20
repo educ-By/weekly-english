@@ -113,6 +113,29 @@ def article(issue_key: str, article_id: str):
     return HTMLResponse(path.read_text(encoding="utf-8"))
 
 
+# ---------- 渲染页兜底路由 ----------
+# 模板里的链接是相对静态文件名(article-<id>.html / <key>/index.html),
+# 在 file:// 本地预览下可用;以下兜底路由让同样的链接在服务器 URL 下也能命中。
+
+@app.get("/issue/{issue_key}/article-{article_id}.html", response_class=HTMLResponse)
+def article_in_issue(issue_key: str, article_id: str):
+    path = OUT_DIR / issue_key / f"article-{article_id}.html"
+    if not path.exists():
+        raise HTTPException(404, "Article not found")
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/article-{article_id}.html", response_class=HTMLResponse)
+def article_latest(article_id: str):
+    issues = core.scan_issues(OUT_DIR)
+    if not issues:
+        raise HTTPException(404, "No issues rendered yet")
+    path = OUT_DIR / issues[0]["key"] / f"article-{article_id}.html"
+    if not path.exists():
+        raise HTTPException(404, "Article not found")
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
 # ---------- API ----------
 @app.get("/api/issues")
 def api_issues():
@@ -451,3 +474,24 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "8000"))
     uvicorn.run("server.main:app", host="0.0.0.0", port=port, reload=False)
+
+# ---------- 渲染页兜底路由(必须放在最后,避免遮蔽 /api/* 等路由) ----------
+# 模板里的链接是相对静态文件名(article-<id>.html / <key>/index.html),
+# 在 file:// 本地预览下可用;以下兜底路由让同样的链接在服务器 URL 下也能命中。
+
+@app.get("/{file_path:path}", include_in_schema=False)
+def static_pages_fallback(file_path: str):
+    """兜底:serve OUT_DIR 下生成的静态页(<key>/index.html、archive.html 等)。"""
+    if not file_path:
+        raise HTTPException(404, "Not Found")
+    candidate = (OUT_DIR / file_path).resolve()
+    if not str(candidate).startswith(str(OUT_DIR.resolve())):
+        raise HTTPException(404, "Not Found")
+    if candidate.suffix.lower() not in {".html", ".css", ".js",
+                                        ".png", ".jpg", ".jpeg", ".svg", ".ico",
+                                        ".woff", ".woff2"}:
+        raise HTTPException(404, "Not Found")
+    if not candidate.is_file():
+        raise HTTPException(404, "Not Found")
+    media = "text/html; charset=utf-8" if candidate.suffix == ".html" else None
+    return FileResponse(candidate, media_type=media)
