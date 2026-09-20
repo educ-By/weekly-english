@@ -153,14 +153,21 @@
     let hideTimer = null;
     let pinned = false;   // 点击单词后钉住弹窗,点弹窗/单词以外才关
 
-    // 延迟关闭:给鼠标留出从单词移入弹窗的时间;进入弹窗即取消关闭
+    // 延迟关闭;到点时实时复查 — 鼠标仍停在单词或弹窗上就无限续期
     function hide() {
       if (pinned) return;
       if (hideTimer) clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
+        hideTimer = null;
+        try {
+          if ((active && active.el && active.el.matches(":hover"))
+              || popup.matches(":hover")) {
+            hide();   // 还悬停着 → 续期,不关
+            return;
+          }
+        } catch (_) { /* 老浏览器不支持 :hover 匹配,按原逻辑关 */ }
         popup.hidden = true;
         active = null;
-        hideTimer = null;
       }, 400);
     }
 
@@ -305,6 +312,21 @@
         });
         const data = await r.json();
         out.textContent = data.content || "(no answer)";
+
+        const used = data.usage_tokens || 0;
+        let total = parseInt(localStorage.getItem("we_ask_tokens") || "0", 10) + used;
+        localStorage.setItem("we_ask_tokens", String(total));
+        const usageLine = document.createElement("div");
+        usageLine.className = "ask-usage";
+        usageLine.textContent = `≈ ${total} tokens used so far`;
+        out.appendChild(usageLine);
+        if (total >= 6000 && !localStorage.getItem("we_ask_nudged")) {
+          localStorage.setItem("we_ask_nudged", "1");
+          const tip = document.createElement("div");
+          tip.className = "ask-usage";
+          tip.textContent = "小提示:AI 对话按 token 计量,目前累计约 " + total + " tokens,注意用量哦。";
+          out.appendChild(tip);
+        }
       } catch (err) {
         out.textContent = "AI service is unreachable.";
       }
@@ -434,9 +456,10 @@
       if (!btn) return;
       const token = localStorage.getItem("we_token");
       if (!token) {
-        if (confirm("Sign in to save words to your vocabulary book?")) {
-          location.href = "/auth/login";
-        }
+        // confirm() 在部分浏览器/WebView 会被静默拦截 — 改为按钮自身变成登录入口
+        btn.removeAttribute("data-add-vocab");
+        btn.textContent = "Sign in to save →";
+        btn.addEventListener("click", () => { location.href = "/auth/login"; });
         return;
       }
       const word = btn.dataset.word;

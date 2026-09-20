@@ -112,8 +112,10 @@ def ask(question: str,
         )
         content = resp.choices[0].message.content or ""
         refused = "outside the scope" in content.lower()
+        usage = getattr(resp, "usage", None)
         return {"ok": True, "refused": refused, "content": content.strip(),
-                "model": model or cfg["model"]}
+                "model": model or cfg["model"],
+                "usage_tokens": getattr(usage, "total_tokens", 0) or 0}
     except Exception as e:
         log.warning("deepseek ask failed: %s", e)
         return {"ok": False, "refused": False,

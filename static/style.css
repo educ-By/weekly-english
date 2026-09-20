@@ -27,7 +27,7 @@
 html, body { margin: 0; padding: 0; }
 
 body {
-  background: var(--paper);
+  background: #fff;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 17px;
@@ -48,7 +48,7 @@ a:hover { color: var(--accent); }
 /* ---------- masthead ---------- */
 .masthead {
   border-bottom: 1px solid var(--line);
-  background: var(--paper);
+  background: #fff;
 }
 .masthead .wrap {
   display: flex; align-items: baseline; justify-content: space-between;
@@ -709,3 +709,10 @@ a:hover { color: var(--accent); }
 }
 .level-block.is-closed .block-caret { transform: rotate(-90deg); }
 .level-block.is-closed .block-body { display: none; }
+
+/* ---- AI 对话 token 用量提示 ---- */
+.ask-usage {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted, #6b6f78);
+}
