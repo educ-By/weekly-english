@@ -49,7 +49,19 @@ logging.basicConfig(
 log = logging.getLogger("server")
 
 app = FastAPI(title="Weekly English", version="1.0.0")
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# gzip 压缩:HTML/CSS/JS 体积减 70%+,弱网/远程访问明显提速
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+# 静态资源缓存:带版本参数时浏览器可长缓存,减少重复下载
+class CachedStatic(StaticFiles):
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "public, max-age=3600"
+        return resp
+
+app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
 
 
 @app.on_event("startup")

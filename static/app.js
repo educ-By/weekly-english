@@ -260,7 +260,7 @@
 
     mount.innerHTML = `
       <details class="ask-panel">
-        <summary>Ask about this article · powered by DeepSeek-V4.1-Flash</summary>
+        <summary>Ask about this article · powered by AI</summary>
         <form class="ask-form" autocomplete="off">
           <input type="text" name="q" placeholder="e.g. What does \"flattened\" mean here?" />
           <button class="btn" type="submit">Ask</button>

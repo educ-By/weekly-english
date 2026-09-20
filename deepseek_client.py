@@ -44,8 +44,19 @@ def _env(name: str) -> Optional[str]:
     return v.strip() if v else None
 
 
+def _cfg() -> dict:
+    """通用 LLM 配置:LLM_* 优先,兼容旧 DEEPSEEK_* 变量名。
+    任何 OpenAI ChatCompletions 兼容端点都可用
+    (DeepSeek / 智谱 BigModel / Kimi / 通义 等)。"""
+    return {
+        "api_key": _env("LLM_API_KEY") or _env("DEEPSEEK_API_KEY"),
+        "base_url": _env("LLM_BASE_URL") or _env("DEEPSEEK_BASE_URL") or DEFAULT_BASE_URL,
+        "model": _env("LLM_MODEL") or _env("DEEPSEEK_MODEL") or DEFAULT_MODEL,
+    }
+
+
 def is_configured() -> bool:
-    return bool(_env("DEEPSEEK_API_KEY"))
+    return bool(_cfg()["api_key"])
 
 
 def _client():
@@ -53,8 +64,8 @@ def _client():
         from openai import OpenAI  # type: ignore
     except ImportError as e:
         raise RuntimeError("openai package missing; pip install openai>=1.0") from e
-    base_url = _env("DEEPSEEK_BASE_URL") or DEFAULT_BASE_URL
-    return OpenAI(api_key=_env("DEEPSEEK_API_KEY"), base_url=base_url)
+    cfg = _cfg()
+    return OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
 
 
 def ask(question: str,
@@ -69,7 +80,7 @@ def ask(question: str,
     """
     if not is_configured():
         return {"ok": False, "refused": False,
-                "content": "DeepSeek is not configured. Set DEEPSEEK_API_KEY in .env.",
+                "content": "LLM is not configured. Set LLM_API_KEY (or DEEPSEEK_API_KEY) in .env.",
                 "model": DEFAULT_MODEL}
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -87,7 +98,7 @@ def ask(question: str,
     try:
         client = _client()
         resp = client.chat.completions.create(
-            model=model or _env("DEEPSEEK_MODEL") or DEFAULT_MODEL,
+            model=model or _cfg()["model"],
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -95,7 +106,7 @@ def ask(question: str,
         content = resp.choices[0].message.content or ""
         refused = "outside the scope" in content.lower()
         return {"ok": True, "refused": refused, "content": content.strip(),
-                "model": model or DEFAULT_MODEL}
+                "model": model or _cfg()["model"]}
     except Exception as e:
         log.warning("deepseek ask failed: %s", e)
         return {"ok": False, "refused": False,
@@ -119,12 +130,12 @@ def lookup_word(word: str,
 
     if not is_configured():
         return {"ok": False, "word": word,
-                "translation": "Configure DEEPSEEK_API_KEY to enable the inline dictionary."}
+                "translation": "Configure LLM_API_KEY (or DEEPSEEK_API_KEY) to enable the inline dictionary."}
 
     try:
         client = _client()
         resp = client.chat.completions.create(
-            model=model or _env("DEEPSEEK_MODEL") or DEFAULT_MODEL,
+            model=model or _cfg()["model"],
             messages=[
                 {"role": "system",
                  "content": "You are a precise English-Chinese dictionary. "
