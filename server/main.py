@@ -58,7 +58,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 class CachedStatic(StaticFiles):
     def file_response(self, *args, **kwargs):
         resp = super().file_response(*args, **kwargs)
-        resp.headers["Cache-Control"] = "public, max-age=3600"
+        resp.headers["Cache-Control"] = "public, max-age=300"
         return resp
 
 app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
@@ -107,6 +107,27 @@ def archive():
         issues = core.scan_issues(OUT_DIR)
         core.write_index_landing(OUT_DIR, issues)
     return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/issue/article-{article_id}.html", response_class=HTMLResponse)
+def article_under_issue_prefix(article_id: str):
+    """/issue/2026-W38 页上的相对链接会解析成 /issue/article-x.html — 回落最新一期。"""
+    issues = core.scan_issues(OUT_DIR)
+    if not issues:
+        raise HTTPException(404, "No issues rendered yet")
+    path = OUT_DIR / issues[0]["key"] / f"article-{article_id}.html"
+    if not path.exists():
+        raise HTTPException(404, "Article not found")
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/issue/static/{file_path:path}")
+def issue_prefix_static(file_path: str):
+    """/issue/article-x.html 页的相对静态资源解析到 /issue/static/... — 用主静态目录伺服。"""
+    candidate = (STATIC_DIR / file_path).resolve()
+    if not str(candidate).startswith(str(STATIC_DIR.resolve())) or not candidate.is_file():
+        raise HTTPException(404, "Not Found")
+    return FileResponse(candidate)
 
 
 @app.get("/issue/{key}", response_class=HTMLResponse)

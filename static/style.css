@@ -376,7 +376,6 @@ a:hover { color: var(--accent); }
   box-shadow: 0 8px 24px -10px rgba(0,0,0,.18);
   font-size: 13px;
   color: var(--ink);
-  pointer-events: none;
   font-family: var(--font-sans);
 }
 .vocab-popup .vp-word {
@@ -737,3 +736,18 @@ a:hover { color: var(--accent); }
 @media (max-width: 720px) {
   .level-block .block-body { grid-template-columns: 1fr; }
 }
+
+/* ---- hidden 属性必须真正生效(覆盖 .level-block 的 display:block) ---- */
+.level-block[hidden] { display: none !important; }
+
+/* ---- 弹窗关闭按钮 ---- */
+.vocab-popup .vp-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted, #6b6f78);
+  padding: 0 2px;
+}
+.vocab-popup .vp-close:hover { color: var(--ink, #14171c); }

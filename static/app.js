@@ -56,6 +56,11 @@
       });
     });
 
+    // 从文章页返回(bfcache 恢复)时重新同步分层状态
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted) apply();
+    });
+
     document.querySelectorAll('.filter-group[data-filter="level"] .chip')
       .forEach(btn => btn.addEventListener("click", () => {
         document.querySelectorAll('.filter-group[data-filter="level"] .chip')
@@ -138,7 +143,7 @@
     function setVocabContext(word, definition, translation) {
       const articleId = (document.querySelector("article.entry") || {}).id
                           ?.replace(/^article-/, "") || "";
-      const issueKeyMatch = location.pathname.match(/article\/([\d]{4}-W\d{2})\//);
+      const issueKeyMatch = location.pathname.match(/(\d{4}-W\d{2})/);
       const issueKey = issueKeyMatch ? issueKeyMatch[1]
                                       : (document.body.dataset.issueKey || "");
       const sentenceEl = document.querySelector(".entry-body p");
@@ -150,35 +155,13 @@
       popup.dataset.sentence = sentenceEl ? sentenceEl.textContent.trim().slice(0, 240) : "";
     }
 
-    let hideTimer = null;
-    let pinned = false;   // 点击单词后钉住弹窗,点弹窗/单词以外才关
-
-    // 延迟关闭;到点时实时复查 — 鼠标仍停在单词或弹窗上就无限续期
+    // ---- 确定性关闭模型:弹窗一旦显示,只有三种方式关闭 ----
+    //   1. 点弹窗外的任意区域  2. 按 Esc  3. 点弹窗上的 ✕
+    // 没有任何计时器/鼠标移出逻辑 — 迟到的词典响应、缓慢的鼠标移动都不影响它。
     function hide() {
-      if (pinned) return;
-      if (hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => {
-        hideTimer = null;
-        try {
-          if ((active && active.el && active.el.matches(":hover"))
-              || popup.matches(":hover")) {
-            hide();   // 还悬停着 → 续期,不关
-            return;
-          }
-        } catch (_) { /* 老浏览器不支持 :hover 匹配,按原逻辑关 */ }
-        popup.hidden = true;
-        active = null;
-      }, 400);
-    }
-
-    popup.addEventListener("mouseenter", () => {
-      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-    });
-    popup.addEventListener("mouseleave", () => {
-      if (pinned) return;
       popup.hidden = true;
       active = null;
-    });
+    }
 
     function sentenceContext(el) {
       // 取点击词所在句子的原文 — 提高 DeepSeek 释义准确度
@@ -227,11 +210,19 @@
       active = { el, word, ctx };
       lookup(word, ctx).then(info => {
         if (!active || active.word !== word) return;
+        // 弹窗已展示同一词的完整内容时不要重建 DOM —
+        // 否则迟到的响应会在用户点击按钮的瞬间替换按钮,点击落空
+        if (!popup.hidden && popup.dataset.word === word
+            && popup.querySelector(".vp-add") && popup.textContent.indexOf("Add to") !== -1) {
+          setVocabContext(word, info.definition_en || "", info.translation || "");
+          return;
+        }
         const def = info.definition_en || "";
         const tr  = info.translation || "";
         setVocabContext(word, def, tr);
         const html =
           `<div class="vp-word">${escapeHtml(info.word)}` +
+          `<button class="vp-close" data-close-popup title="Close">✕</button>` +
           (info.phonetic ? `<span class="vp-phon">${escapeHtml(info.phonetic)}</span>` : "") +
           (info.cefr_level ? `<span class="vp-level">${escapeHtml(info.cefr_level)}</span>` : "") +
           `</div>` +
@@ -241,10 +232,24 @@
         showAt(el, html);
       });
     }
-    function onLeave(e) {
+
+    article.addEventListener("mouseover", onEnter);
+    article.addEventListener("click", e => {
       const el = e.target.closest(".rare, .vocab-word");
-      if (el && article.contains(el)) hide();
-    }
+      if (el && article.contains(el)) onEnter({ target: el });
+    });
+    // 关闭通道:✕ 按钮 / 弹窗外点击 / Esc
+    popup.addEventListener("click", e => {
+      if (e.target.closest("[data-close-popup]")) hide();
+    });
+    document.addEventListener("click", e => {
+      if (popup.hidden) return;
+      if (popup.contains(e.target) || e.target.closest(".rare, .vocab-word")) return;
+      hide();
+    });
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && !popup.hidden) hide();
+    });
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => ({
@@ -252,24 +257,6 @@
         '"': "&quot;", "'": "&#39;"
       }[c]));
     }
-
-    article.addEventListener("mouseover", onEnter);
-    article.addEventListener("mouseout", onLeave);
-    article.addEventListener("click", e => {
-      const el = e.target.closest(".rare, .vocab-word");
-      if (el && article.contains(el)) {
-        onEnter({ target: el });
-        pinned = true;   // 点击 = 钉住,弹窗不再跟随鼠标离开消失
-      }
-    });
-    // 点击弹窗和单词以外的区域 → 取消钉住并关闭
-    document.addEventListener("click", e => {
-      if (!pinned) return;
-      if (popup.contains(e.target) || e.target.closest(".rare, .vocab-word")) return;
-      pinned = false;
-      popup.hidden = true;
-      active = null;
-    });
   }
 
   /* ---------------- AI 提问面板 ---------------- */
@@ -374,7 +361,7 @@
     if (!token) return;  // 未登录不上报
 
     const articleId = article.id.replace(/^article-/, "");
-    const issueKeyMatch = location.pathname.match(/article\/([\d]{4}-W\d{2})\//);
+    const issueKeyMatch = location.pathname.match(/(\d{4}-W\d{2})/);
     const issueKey = issueKeyMatch ? issueKeyMatch[1] : (document.body.dataset.issueKey || "");
 
     let seconds = 0;
@@ -466,7 +453,7 @@
         btn.addEventListener("click", () => { location.href = "/auth/login"; });
         return;
       }
-      const word = btn.dataset.word;
+      const word = popup.dataset.word;   // data-word 在弹窗容器上,不在按钮上
       const articleId = popup.dataset.articleId;
       const issueKey = popup.dataset.issueKey;
       const definition = popup.dataset.definition || "";
@@ -602,15 +589,20 @@
 
   /* ---------------- init ---------------- */
   document.addEventListener("DOMContentLoaded", () => {
-    if (page === "index") bindIndex();
+    window.__initErrors = [];
+    const safe = (name, fn) => {
+      try { fn(); }
+      catch (e) { window.__initErrors.push(name + ": " + (e && e.message || e)); }
+    };
+    if (page === "index") safe("bindIndex", bindIndex);
     if (page === "article") {
-      bindReading();
-      highlightRare();
-      bindVocabPopup();
-      bindVocabAddButton();
-      bindAskPanel();
-      bindReadingProgress();
+      safe("bindReading", bindReading);
+      safe("highlightRare", highlightRare);
+      safe("bindVocabPopup", bindVocabPopup);
+      safe("bindVocabAddButton", bindVocabAddButton);
+      safe("bindAskPanel", bindAskPanel);
+      safe("bindReadingProgress", bindReadingProgress);
     }
-    if (page !== "auth") bindAccountLink();
+    if (page !== "auth") safe("bindAccountLink", bindAccountLink);
   });
 })();
