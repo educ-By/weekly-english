@@ -111,8 +111,8 @@
       const pw = popup.offsetWidth;
       const ph = popup.offsetHeight;
       let x = r.left + r.width / 2 - pw / 2;
-      let y = r.top - ph - 10;
-      if (y < 8) y = r.bottom + 10;
+      let y = r.top - ph - 4;   // 紧贴单词,不留缝隙,鼠标移过去不会穿过空档
+      if (y < 8) y = r.bottom + 4;
       x = Math.max(8, Math.min(window.innerWidth - pw - 8, x));
       popup.style.left = x + "px";
       popup.style.top = y + "px";
@@ -135,21 +135,24 @@
     }
 
     let hideTimer = null;
+    let pinned = false;   // 点击单词后钉住弹窗,点弹窗/单词以外才关
 
     // 延迟关闭:给鼠标留出从单词移入弹窗的时间;进入弹窗即取消关闭
     function hide() {
+      if (pinned) return;
       if (hideTimer) clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
         popup.hidden = true;
         active = null;
         hideTimer = null;
-      }, 250);
+      }, 400);
     }
 
     popup.addEventListener("mouseenter", () => {
       if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
     });
     popup.addEventListener("mouseleave", () => {
+      if (pinned) return;
       popup.hidden = true;
       active = null;
     });
@@ -159,6 +162,8 @@
       const p = el.closest("p");
       return p ? p.textContent.trim().slice(0, 240) : "";
     }
+
+    const OFFLINE_MSG = "AI service is not available offline.";
 
     async function lookup(word, ctx) {
       const key = word + "|" + (ctx || "").slice(0, 60);
@@ -183,7 +188,10 @@
           cefr_level: "",
         };
       })();
-      cache.set(key, p);
+      // 失败的查询不进缓存 — 修好 key 后刷新即可重试,不会一直显示 offline
+      p.then(info => {
+        if (info && info.translation !== OFFLINE_MSG) cache.set(key, p);
+      });
       return p;
     }
 
@@ -226,7 +234,18 @@
     article.addEventListener("mouseout", onLeave);
     article.addEventListener("click", e => {
       const el = e.target.closest(".rare, .vocab-word");
-      if (el && article.contains(el)) onEnter({ target: el });
+      if (el && article.contains(el)) {
+        onEnter({ target: el });
+        pinned = true;   // 点击 = 钉住,弹窗不再跟随鼠标离开消失
+      }
+    });
+    // 点击弹窗和单词以外的区域 → 取消钉住并关闭
+    document.addEventListener("click", e => {
+      if (!pinned) return;
+      if (popup.contains(e.target) || e.target.closest(".rare, .vocab-word")) return;
+      pinned = false;
+      popup.hidden = true;
+      active = null;
     });
   }
 
