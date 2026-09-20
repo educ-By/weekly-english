@@ -118,6 +118,65 @@ _IRREGULAR = {
     "better": "well", "best": "well", "worse": "bad", "worst": "bad",
     "further": "far", "furthest": "far", "farthest": "far",
     "older": "old", "elder": "old", "eldest": "old",
+    # be / do / have 系(最常用,绝不能误标)
+    "am": "be", "is": "be", "are": "be", "was": "be", "were": "be",
+    "been": "be", "being": "be",
+    "did": "do", "does": "do", "done": "do", "doing": "do",
+    "had": "have", "has": "have", "having": "have",
+    "said": "say", "says": "say", "saying": "say",
+    "made": "make", "makes": "make", "making": "make",
+    "went": "go", "gone": "go", "goes": "go", "going": "go",
+    "got": "get", "gotten": "get", "gets": "get", "getting": "get",
+    "saw": "see", "seen": "see", "sees": "see", "seeing": "see",
+    "knew": "know", "known": "know", "knows": "know", "knowing": "know",
+    "took": "take", "taken": "take", "takes": "take", "taking": "take",
+    "gave": "give", "given": "give", "gives": "give", "giving": "give",
+    "found": "find", "finds": "find", "finding": "find",
+    "told": "tell", "tells": "tell", "telling": "tell",
+    "felt": "feel", "feels": "feel", "feeling": "feel",
+    "left": "leave", "leaves": "leave", "leaving": "leave",
+    "kept": "keep", "keeps": "keep", "keeping": "keep",
+    "held": "hold", "holds": "hold", "holding": "hold",
+    "thought": "think", "thinks": "think", "thinking": "think",
+    "taught": "teach", "teaches": "teach", "teaching": "teach",
+    "won": "win", "wins": "win", "winning": "win",
+    "lost": "lose", "loses": "lose", "losing": "lose",
+    "met": "meet", "meets": "meet", "meeting": "meet",
+    "ran": "run", "runs": "run", "running": "run",
+    "rode": "ride", "ridden": "ride", "rides": "ride", "riding": "ride",
+    "wrote": "write", "written": "write", "writes": "write", "writing": "write",
+    "drove": "drive", "driven": "drive", "drives": "drive", "driving": "drive",
+    "ate": "eat", "eaten": "eat", "eats": "eat", "eating": "eat",
+    "drank": "drink", "drunk": "drink", "drinks": "drink", "drinking": "drink",
+    "wore": "wear", "worn": "wear", "wears": "wear", "wearing": "wear",
+    "blew": "blow", "blown": "blow", "blows": "blow", "blowing": "blow",
+    "grew": "grow", "grown": "grow", "grows": "grow", "growing": "grow",
+    "flew": "fly", "flown": "fly", "flies": "fly", "flying": "fly",
+    "slept": "sleep", "sleeps": "sleep", "sleeping": "sleep",
+    "spoke": "speak", "spoken": "speak", "speaks": "speak", "speaking": "speak",
+    "stood": "stand", "stands": "stand", "standing": "stand",
+    "understood": "understand", "understands": "understand",
+    "sent": "send", "sends": "send", "sending": "send",
+    "spent": "spend", "spends": "spend", "spending": "spend",
+    "sold": "sell", "sells": "sell", "selling": "sell",
+    "fell": "fall", "falls": "fall", "falling": "fall",
+    "paid": "pay", "pays": "pay", "paying": "pay",
+    "sat": "sit", "sits": "sit", "sitting": "sit",
+    "meant": "mean", "means": "mean",
+    "heard": "hear", "hears": "hear", "hearing": "hear",
+    "led": "lead", "leads": "lead", "leading": "lead",
+    "lay": "lie", "lain": "lie", "lies": "lie", "lying": "lie",
+    "rose": "rise", "risen": "rise", "rises": "rise", "rising": "rise",
+    "drew": "draw", "drawn": "draw", "draws": "draw", "drawing": "draw",
+    "shook": "shake", "shaken": "shake", "shakes": "shake", "shaking": "shake",
+    "stole": "steal", "stolen": "steal", "steals": "steal", "stealing": "steal",
+    "forgot": "forget", "forgotten": "forget", "forgets": "forget",
+    "hid": "hide", "hidden": "hide", "hides": "hide", "hiding": "hide",
+    "rang": "ring", "rung": "ring", "rings": "ring", "ringing": "ring",
+    "swam": "swim", "swum": "swim", "swims": "swim", "swimming": "swim",
+    "sang": "sing", "sung": "sing", "sings": "sing", "singing": "sing",
+    "froze": "freeze", "frozen": "freeze", "freezes": "freeze",
+    "woke": "wake", "woken": "wake", "wakes": "wake", "waking": "wake",
 }
 
 # 极简词形归一:不做语言学完备,只覆盖常见英语曲折
@@ -128,6 +187,9 @@ def _lemma(t: str) -> str:
     # 先查不规则表
     if t in _IRREGULAR:
         return _IRREGULAR[t]
+    # 所有格 world's / students' → 原词
+    if t.endswith("'s") or t.endswith("s'"):
+        return t[:-2]
     # -ies → -y
     if t.endswith("ies") and len(t) > 4:
         return t[:-3] + "y"
@@ -229,6 +291,11 @@ def _load_whitelist(names: tuple = ("highschool_whitelist.txt", "cet_whitelist.t
         if w.endswith("y") and len(w) > 2 and w[-2] not in "aeiou":
             expanded.add(w[:-1] + "ier")
             expanded.add(w[:-1] + "iest")
+        elif w.endswith("e") and len(w) > 2:
+            expanded.add(w + "r")          # large → larger
+            expanded.add(w + "st")         # large → largest
+            expanded.add(w[:-1] + "er")
+            expanded.add(w[:-1] + "est")
         elif len(w) > 2 and w[-1] not in "aeiouwxy":
             expanded.add(w + "er")
             expanded.add(w + "est")

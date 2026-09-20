@@ -208,6 +208,14 @@
       if (!word) return;
       const ctx = sentenceContext(el);
       active = { el, word, ctx };
+      // 立即显示加载态 — 体感秒开,释义返回后原地填充
+      if (popup.hidden || popup.dataset.word !== word) {
+        setVocabContext(word, "", "");
+        showAt(el,
+          `<div class="vp-word">${escapeHtml(word)}` +
+          `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
+          `<div class="vp-trans vp-loading">查询中…</div>`);
+      }
       lookup(word, ctx).then(info => {
         if (!active || active.word !== word) return;
         // 弹窗已展示同一词的完整内容时不要重建 DOM —

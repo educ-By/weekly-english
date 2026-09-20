@@ -10,8 +10,11 @@ DeepSeek 客户端 — 用于后端 AI 服务。
 """
 from __future__ import annotations
 import os
+import re
 import logging
 from typing import Iterable, Optional
+
+_re_cjk = re.compile(r"[\u4e00-\u9fff]")
 
 log = logging.getLogger(__name__)
 
@@ -141,15 +144,21 @@ def summarize_zh(title: str, body: str, model: str | None = None) -> str:
         if lvl:
             extra["extra_body"] = {"thinking": {"level": lvl}}
         client = _client(cfg)
-        resp = client.chat.completions.create(
-            model=model or cfg["model"],
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=800, temperature=0.2, **extra)
-        text = (resp.choices[0].message.content or "").strip().splitlines()
-        out = text[0].strip() if text else ""
-        if len(_zh_summary_cache) > 600:
-            _zh_summary_cache.clear()
-        _zh_summary_cache[ck] = out
+        out = ""
+        for attempt in range(2):   # 首次失败/没输出中文时重试一次
+            resp = client.chat.completions.create(
+                model=model or cfg["model"],
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=800, temperature=0.2, **extra)
+            lines = (resp.choices[0].message.content or "").strip().splitlines()
+            out = lines[0].strip() if lines else ""
+            if out and _re_cjk.search(out):
+                break
+            out = ""
+        if out:
+            if len(_zh_summary_cache) > 600:
+                _zh_summary_cache.clear()
+            _zh_summary_cache[ck] = out
         return out
     except Exception as e:
         log.warning("summarize_zh failed: %s", e)

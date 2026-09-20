@@ -717,11 +717,7 @@ a:hover { color: var(--accent); }
 }
 
 /* ---- 分层网格:每层末尾落单的卡片居中,不留右侧空位 ---- */
-.level-block .card:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-  max-width: calc(50% - 9px);
-  justify-self: center;
-}
+
 
 /* ---- 分层布局修正:卡片容器独占整行并自身成为网格 ---- */
 .level-block { display: block; }
@@ -751,3 +747,6 @@ a:hover { color: var(--accent); }
   padding: 0 2px;
 }
 .vocab-popup .vp-close:hover { color: var(--ink, #14171c); }
+
+/* ---- 词典查询加载态 ---- */
+.vocab-popup .vp-loading { color: var(--muted, #6b6f78); font-style: italic; }
