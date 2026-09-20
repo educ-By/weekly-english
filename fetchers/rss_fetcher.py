@@ -131,17 +131,25 @@ def fetch_rss(source_name: str,
     return out
 
 
-def fetch_many(sources: Iterable[dict]) -> list[dict]:
+def fetch_many(sources: Iterable[dict], max_workers: int = 8) -> list[dict]:
     """
     sources: [{"name": "Economist", "feed": "...", "limit": 6}, ...]
+    并发抓取 — 单个源失败(超时/被墙/反爬)不影响其他源。
     """
-    all_records: list[dict] = []
-    for s in sources:
-        records = fetch_rss(
-            source_name=s["name"],
-            feed_url=s["feed"],
-            limit=s.get("limit", 6),
-            require_full_text=s.get("full_text", True),
-        )
-        all_records.extend(records)
-    return all_records
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _one(s: dict) -> list[dict]:
+        try:
+            return fetch_rss(
+                source_name=s["name"],
+                feed_url=s["feed"],
+                limit=s.get("limit", 6),
+                require_full_text=s.get("full_text", True),
+            )
+        except Exception as e:
+            log.warning("source failed: %s (%s)", s.get("name"), e)
+            return []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        results = list(ex.map(_one, list(sources)))
+    return [r for records in results for r in records]

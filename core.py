@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 LEVEL_LABEL = {"B1": "入门", "B2": "进阶", "C1": "高阶"}
 
 DEFAULT_RSS_SOURCES = [
+    # ---- 国际主流刊物(部分在国内网络需代理,超时会自动跳过) ----
     {"name": "The Economist",
      "feed": "https://www.economist.com/finance-and-economics/rss.xml",
      "limit": 3, "full_text": True},
@@ -36,24 +37,72 @@ DEFAULT_RSS_SOURCES = [
     {"name": "BBC Learning English",
      "feed": "https://www.bbc.co.uk/learningenglish/english/features/news-report/rss.xml",
      "limit": 3, "full_text": True},
-    {"name": "NPR Topics: Education",
-     "feed": "https://feeds.npr.org/1032/rss.xml",
-     "limit": 3, "full_text": True},
     {"name": "Scientific American",
      "feed": "https://rss.sciam.com/ScientificAmerican-Global",
      "limit": 3, "full_text": True},
+
+    # ---- 新闻(国内直连可达) ----
+    {"name": "NPR News",
+     "feed": "https://feeds.npr.org/1001/rss.xml",
+     "limit": 2, "full_text": True},
+    {"name": "NPR Topics: Education",
+     "feed": "https://feeds.npr.org/1032/rss.xml",
+     "limit": 2, "full_text": True},
+    {"name": "NPR Science",
+     "feed": "https://feeds.npr.org/1007/rss.xml",
+     "limit": 2, "full_text": True},
+    {"name": "CBS News",
+     "feed": "https://www.cbsnews.com/latest/rss/main",
+     "limit": 2, "full_text": True},
+    {"name": "CNBC Top News",
+     "feed": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
+     "limit": 2, "full_text": True},
+    {"name": "Sky News",
+     "feed": "https://feeds.skynews.com/feeds/rss/world.xml",
+     "limit": 2, "full_text": True},
+    {"name": "France 24",
+     "feed": "https://www.france24.com/en/rss",
+     "limit": 2, "full_text": True},
+    {"name": "Global Times",
+     "feed": "https://www.globaltimes.cn/rss/outbrain.xml",
+     "limit": 2, "full_text": True},
+
+    # ---- 科学 / 科技 ----
+    {"name": "MIT Technology Review",
+     "feed": "https://www.technologyreview.com/feed/",
+     "limit": 3, "full_text": True},
+    {"name": "Nature News",
+     "feed": "https://www.nature.com/nature.rss",
+     "limit": 3, "full_text": True},
+    {"name": "New Scientist",
+     "feed": "https://www.newscientist.com/feed/home",
+     "limit": 2, "full_text": True},
+    {"name": "ScienceDaily",
+     "feed": "https://www.sciencedaily.com/rss/all.xml",
+     "limit": 2, "full_text": True},
+    {"name": "Phys.org",
+     "feed": "https://phys.org/rss-feed/",
+     "limit": 2, "full_text": True},
+    {"name": "Ars Technica",
+     "feed": "https://feeds.arstechnica.com/arstechnica/index",
+     "limit": 2, "full_text": True},
+    {"name": "TechCrunch",
+     "feed": "https://techcrunch.com/feed/",
+     "limit": 2, "full_text": True},
+    {"name": "Engadget",
+     "feed": "https://www.engadget.com/rss.xml",
+     "limit": 2, "full_text": True},
+    {"name": "Nautilus",
+     "feed": "https://nautil.us/feed/",
+     "limit": 2, "full_text": True},
+
+    # ---- 文化 / 长文 ----
     {"name": "Smithsonian Magazine",
      "feed": "https://www.smithsonianmag.com/rss/articles/",
-     "limit": 3, "full_text": True},
+     "limit": 2, "full_text": True},
     {"name": "Aeon",
      "feed": "https://aeon.co/feed.rss",
-     "limit": 3, "full_text": True},
-    {"name": "China Daily",
-     "feed": "https://www.chinadaily.com.cn/rss/world.xml",
-     "limit": 3, "full_text": True},
-    {"name": "Reader's Digest",
-     "feed": "https://www.rd.com/feed/",
-     "limit": 3, "full_text": True},
+     "limit": 2, "full_text": True},
 ]
 
 
@@ -285,7 +334,7 @@ def write_index_landing(out_dir: Path, issues: list[dict]) -> None:
 
 def full_refresh(out_dir: Path,
                  config: dict | None = None,
-                 max_articles: int = 10) -> dict:
+                 max_articles: int = 40) -> dict:
     """
     一次完整刷新:抓取 → 分级 → 渲染到 out_dir/<issue_key>/ → 更新主页与 archive。
     返回最新一期路径信息。

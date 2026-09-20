@@ -181,21 +181,23 @@ curl "http://localhost:8000/api/dict?word=flattened&sentence=The+Phillips+curve+
 
 ---
 
-## 数据来源(默认 9 个 RSS)
+## 数据来源(默认 23 个 RSS,并发抓取)
 
-| 来源 | 风格 | 典型难度 |
-| --- | --- | --- |
-| The Economist | 时政经济 | C1 |
-| The Guardian | 国际新闻 | B2–C1 |
-| BBC Learning English | 英语学习 | B1 |
-| NPR Topics: Education | 教育议题 | B1–B2 |
-| Scientific American | 科普 | B2–C1 |
-| Smithsonian Magazine | 文化历史 | B2 |
-| Aeon | 哲学/文化 | C1 |
-| China Daily | 中式英文 | B1–B2 |
-| Reader's Digest | 生活方式 | B1–B2 |
+**新闻类(国内直连可达):** NPR News / NPR Education / NPR Science / CBS News /
+CNBC / Sky News / France 24 / Global Times
+
+**科学/科技:** MIT Technology Review / Nature News / New Scientist / ScienceDaily /
+Phys.org / Ars Technica / TechCrunch / Engadget / Nautilus / Scientific American*
+
+**文化/长文:** Smithsonian Magazine / Aeon / The Economist* / The Guardian* /
+BBC Learning English*
+
+带 `*` 的源在国内网络环境下通常需要代理(连接超时会自动跳过,不影响其他源;
+配置代理后自动恢复)。原 China Daily(RSS 已下线)与 Reader's Digest(硬反爬)
+已移除。
 
 切换/新增 RSS:在 `core.DEFAULT_RSS_SOURCES` 中修改,或用 `--config my.json` 指定。
+每期文章数上限 `core.full_refresh(max_articles=40)`。
 
 ---
 
