@@ -44,27 +44,33 @@ def _env(name: str) -> Optional[str]:
     return v.strip() if v else None
 
 
-def _cfg() -> dict:
-    """通用 LLM 配置:LLM_* 优先,兼容旧 DEEPSEEK_* 变量名。
-    任何 OpenAI ChatCompletions 兼容端点都可用
-    (DeepSeek / 智谱 BigModel / Kimi / 通义 等)。"""
-    return {
-        "api_key": _env("LLM_API_KEY") or _env("DEEPSEEK_API_KEY"),
-        "base_url": _env("LLM_BASE_URL") or _env("DEEPSEEK_BASE_URL") or DEFAULT_BASE_URL,
-        "model": _env("LLM_MODEL") or _env("DEEPSEEK_MODEL") or DEFAULT_MODEL,
-    }
+def _cfg(*groups: str) -> dict:
+    """按顺序取第一个配置了 API_KEY 的组;每组形如 {G}_API_KEY / {G}_BASE_URL / {G}_MODEL。
+    任何 OpenAI ChatCompletions 兼容端点都可用(DeepSeek / 智谱 BigModel / Kimi / 通义 等)。
+    例:ask() 用 _cfg("ASK", "DEEPSEEK", "LLM") — 交流优先 DeepSeek;
+        lookup_word() 用 _cfg("LLM", "DEEPSEEK") — 单词优先 GLM 等便宜模型。"""
+    for g in groups:
+        key = _env(f"{g}_API_KEY")
+        if key:
+            return {
+                "api_key": key,
+                "base_url": _env(f"{g}_BASE_URL") or DEFAULT_BASE_URL,
+                "model": _env(f"{g}_MODEL") or DEFAULT_MODEL,
+                "group": g,
+            }
+    return {"api_key": None, "base_url": DEFAULT_BASE_URL,
+            "model": DEFAULT_MODEL, "group": None}
 
 
 def is_configured() -> bool:
-    return bool(_cfg()["api_key"])
+    return bool(_cfg("LLM", "ASK", "DEEPSEEK")["api_key"])
 
 
-def _client():
+def _client(cfg: dict):
     try:
         from openai import OpenAI  # type: ignore
     except ImportError as e:
         raise RuntimeError("openai package missing; pip install openai>=1.0") from e
-    cfg = _cfg()
     return OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
 
 
@@ -78,9 +84,10 @@ def ask(question: str,
     context_articles: 用来限定范围 — 模型只允许用这些文章作为上下文。
     返回:{ok, content, refused, model}
     """
-    if not is_configured():
+    cfg = _cfg("ASK", "DEEPSEEK", "LLM")
+    if not cfg["api_key"]:
         return {"ok": False, "refused": False,
-                "content": "LLM is not configured. Set LLM_API_KEY (or DEEPSEEK_API_KEY) in .env.",
+                "content": "LLM is not configured. Set ASK_API_KEY / LLM_API_KEY in .env.",
                 "model": DEFAULT_MODEL}
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -96,9 +103,9 @@ def ask(question: str,
     messages.append({"role": "user", "content": question.strip()})
 
     try:
-        client = _client()
+        client = _client(cfg)
         resp = client.chat.completions.create(
-            model=model or _cfg()["model"],
+            model=model or cfg["model"],
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -106,59 +113,74 @@ def ask(question: str,
         content = resp.choices[0].message.content or ""
         refused = "outside the scope" in content.lower()
         return {"ok": True, "refused": refused, "content": content.strip(),
-                "model": model or _cfg()["model"]}
+                "model": model or cfg["model"]}
     except Exception as e:
         log.warning("deepseek ask failed: %s", e)
         return {"ok": False, "refused": False,
                 "content": "AI service is temporarily unavailable.", "model": DEFAULT_MODEL}
 
 
+_lookup_cache: dict[str, dict] = {}   # (word|ctx) → 释义,进程内缓存省 token
+
 def lookup_word(word: str,
                 sentence_context: str | None = None,
                 model: str | None = None) -> dict:
     """
-    用 DeepSeek 释义单个英文词(可选带句中上下文)。
-    用于 /api/dict?word=x — 替代或补充有道词典。
+    单词速查:GLM 等便宜模型,只回短中文释义(取本句意)。
+    prompt/输出都极短,配合进程内缓存,token 消耗最小化。
+    用于 /api/dict?word=x
     """
-    prompt = (
-        f"Define the English word: {word}\n"
-        + (f"In this sentence: \"{sentence_context}\"\n" if sentence_context else "")
-        + "Reply in this exact JSON format:\n"
-        + '{"phonetic": "...", "definition_en": "...", "definition_zh": "...", '
-        + '"examples": ["...", "..."], "cefr_level": "A1|A2|B1|B2|C1|C2"}'
-    )
+    ctx = (sentence_context or "").strip()[:160]   # 只保留本句,截断省 token
+    ck = f"{word.lower()}|{ctx}"
+    if ck in _lookup_cache:
+        return _lookup_cache[ck]
 
-    if not is_configured():
+    cfg = _cfg("LLM", "DEEPSEEK", "ASK")
+    if not cfg["api_key"]:
         return {"ok": False, "word": word,
                 "translation": "Configure LLM_API_KEY (or DEEPSEEK_API_KEY) to enable the inline dictionary."}
 
+    prompt = (
+        'Word: "' + word + '"\n'
+        + ('Sentence: "' + ctx + '"\n' if ctx else "")
+        + '给出该词在本句中的简洁中文释义。'
+        '只输出一行 JSON:{"phonetic":"英式音标","zh":"本句义,不超过15字","pos":"词性"}'
+    )
     try:
-        client = _client()
+        client = _client(cfg)
+        # 智谱 GLM 等思考型模型:可配 LLM_THINKING_LEVEL=low 控制思考档位省 token
+        extra = {}
+        lvl = _env("LLM_THINKING_LEVEL")
+        if lvl:
+            extra["extra_body"] = {"thinking": {"level": lvl}}
         resp = client.chat.completions.create(
-            model=model or _cfg()["model"],
-            messages=[
-                {"role": "system",
-                 "content": "You are a precise English-Chinese dictionary. "
-                            "Output JSON only, no markdown, no commentary."},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=400, temperature=0.0,
-            response_format={"type": "json_object"},
+            model=model or cfg["model"],
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400, temperature=0.1,
+            **extra,
         )
-        text = resp.choices[0].message.content or "{}"
-        import json as _json
-        try:
-            data = _json.loads(text)
-        except Exception:
-            data = {"definition_en": text, "definition_zh": ""}
-        return {"ok": True, "word": word,
-                "phonetic": data.get("phonetic", ""),
-                "definition_en": data.get("definition_en", ""),
-                "translation": data.get("definition_zh")
-                               or data.get("definition_en", ""),
-                "examples": data.get("examples", []),
-                "cefr_level": data.get("cefr_level", "")}
+        text = (resp.choices[0].message.content or "").strip()
+        # 健壮解析:剥掉 markdown 围栏,截取第一个 {...}
+        import json as _json, re as _re
+        m = _re.search(r"\{.*\}", text, _re.S)
+        data = {}
+        if m:
+            try:
+                data = _json.loads(m.group(0))
+            except Exception:
+                data = {}
+        info = {"ok": True, "word": word,
+                "phonetic": (data.get("phonetic") or "") if isinstance(data, dict) else "",
+                "definition_en": "",
+                "translation": (data.get("zh") or data.get("translation") or text[:60]),
+                "examples": [],
+                "cefr_level": "",
+                "model": cfg["model"]}
+        if len(_lookup_cache) > 800:
+            _lookup_cache.clear()
+        _lookup_cache[ck] = info
+        return info
     except Exception as e:
-        log.warning("deepseek lookup_word failed: %s", e)
+        log.warning("lookup_word failed: %s", e)
         return {"ok": False, "word": word,
                 "translation": "AI service is temporarily unavailable."}
