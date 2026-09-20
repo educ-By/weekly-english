@@ -193,8 +193,15 @@ Phys.org / Ars Technica / TechCrunch / Engadget / Nautilus / Scientific American
 BBC Learning English*
 
 带 `*` 的源在国内网络环境下通常需要代理(连接超时会自动跳过,不影响其他源;
-配置代理后自动恢复)。原 China Daily(RSS 已下线)与 Reader's Digest(硬反爬)
-已移除。
+配置代理后自动恢复)。原 China Daily RSS 已下线,改走 HTML 爬取;Reader's Digest
+因硬反爬移除。
+
+**The Guardian 双通道**:RSS 被墙,但官方 API(content.guardianapis.com)国内直连
+可达 — 在 `.env` / 环境变量里配置 `GUARDIAN_API_KEY`(`open-platform.theguardian.com`
+免费注册)即自动启用,返回官方全文。
+
+**代理**:requests 原生读取 `HTTPS_PROXY` 环境变量 — 本地挂代理后启动服务,
+被墙的源(Economist/BBC/SciAm 等)会自动恢复抓取。
 
 切换/新增 RSS:在 `core.DEFAULT_RSS_SOURCES` 中修改,或用 `--config my.json` 指定。
 每期文章数上限 `core.full_refresh(max_articles=40)`。

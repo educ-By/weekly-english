@@ -117,7 +117,9 @@ def fetch_index_pages(source_name: str,
         href = a.get("href") or ""
         if not href:
             continue
-        if base_url and href.startswith("/"):
+        if href.startswith("//"):
+            href = "https:" + href
+        elif base_url and href.startswith("/"):
             href = base_url.rstrip("/") + href
         if href in seen:
             continue

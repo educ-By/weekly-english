@@ -9,6 +9,7 @@ core — 后端 / 脚本共用的业务逻辑入口
 from __future__ import annotations
 import datetime as dt
 import logging
+import os
 import re
 import shutil
 from pathlib import Path
@@ -17,6 +18,7 @@ import jinja2
 
 from fetchers.rss_fetcher import fetch_many
 from fetchers.api_fetcher import fetch_newsapi
+from fetchers.guardian_fetcher import fetch_guardian
 from fetchers.html_fetcher import fetch_index_pages, fetch_page
 from pipeline.difficulty import evaluate
 from pipeline.highlight import find_out_of_scope_words
@@ -105,6 +107,21 @@ DEFAULT_RSS_SOURCES = [
      "limit": 2, "full_text": True},
 ]
 
+# 无 RSS 的免费源 — 走 HTML 爬取(RSS 已下线的 China Daily 等)
+DEFAULT_HTML_SOURCES = [
+    {"name": "China Daily",
+     "index_url": "https://www.chinadaily.com.cn/world",
+     "link_sel": "a[href*='/a/2']",
+     "base_url": "https://www.chinadaily.com.cn",
+     "limit": 3,
+     "title_sel": "h1",
+     "body_sel": "#Content"},
+]
+
+# The Guardian 官方 API — 设置 GUARDIAN_API_KEY 即启用(免费开发 key,
+# open-platform.theguardian.com 注册;API 域名国内直连可达)
+DEFAULT_GUARDIAN_SECTIONS = ["world", "technology"]
+
 
 def week_label(today: dt.date | None = None) -> str:
     today = today or dt.date.today()
@@ -188,6 +205,16 @@ def collect(config: dict) -> list[dict]:
     log.info("RSS sources: %d", len(rss))
     records.extend(fetch_many(rss))
 
+    guardian_cfg = config.get("guardian")
+    if guardian_cfg is None and os.environ.get("GUARDIAN_API_KEY"):
+        guardian_cfg = {"sections": DEFAULT_GUARDIAN_SECTIONS, "limit": 2}
+    if guardian_cfg and os.environ.get("GUARDIAN_API_KEY"):
+        for sec in guardian_cfg.get("sections", ["world"]):
+            records.extend(fetch_guardian(
+                section=sec, limit=guardian_cfg.get("limit", 2),
+                api_key=guardian_cfg.get("api_key"),
+            ))
+
     api_cfg = config.get("newsapi") or {}
     if api_cfg.get("enabled"):
         for q in api_cfg.get("queries", []):
@@ -196,7 +223,9 @@ def collect(config: dict) -> list[dict]:
                 api_key=api_cfg.get("api_key"), limit=q.get("limit", 4),
             ))
 
-    html_cfg = config.get("html") or []
+    html_cfg = config.get("html")
+    if html_cfg is None:
+        html_cfg = DEFAULT_HTML_SOURCES
     for item in html_cfg:
         if "index_url" in item:
             records.extend(fetch_index_pages(
