@@ -402,6 +402,65 @@ def write_index_landing(out_dir: Path, issues: list[dict]) -> None:
     (out_dir / "archive.html").write_text(archive_html, encoding="utf-8")
 
 
+_JUNK_PATTERNS = [
+    # News in Levels 每篇文章都带的站点推广样板文 — 不是正文
+    re.compile(r"do you want to learn english", re.I),
+    re.compile(r"we have a special book for you", re.I),
+    # 嵌入播放器残留
+    re.compile(r"embed embed\b", re.I),
+]
+
+def _filter_junk(records: list[dict]) -> list[dict]:
+    """删掉没有阅读价值的文章:站点推广样板文、嵌入播放器乱码简介。"""
+    out = []
+    for r in records:
+        text = (r.get("deck") or "") + " " + (r.get("body") or "")[:500]
+        if any(p.search(text) for p in _JUNK_PATTERNS):
+            log.info("junk dropped: %s (%s)", r.get("title", "")[:50], r.get("source", ""))
+            continue
+        out.append(r)
+    return out
+
+
+def _dedupe_same_story(records: list[dict]) -> list[dict]:
+    """同一故事的分级重复(如 News in Levels level 1/2/3)只留正文最长的一篇。"""
+    import hashlib
+    best: dict[str, dict] = {}
+    order: list[str] = []
+    for r in records:
+        norm = re.sub(r"[\s\-–—_]*level\s*\d+$", "", (r.get("title") or "").strip(),
+                      flags=re.I).strip().lower()
+        if not norm:
+            norm = r.get("id", "")
+        n = len(r.get("body") or "")
+        if norm not in best:
+            best[norm] = r
+            order.append(norm)
+        else:
+            if n > len(best[norm].get("body") or ""):
+                best[norm] = r
+    return [best[k] for k in order]
+
+
+def _apply_zh_summaries(articles: list[dict]) -> None:
+    """卡片简介换成 GLM 中文总结(并发,失败回退英文摘要)。"""
+    from concurrent.futures import ThreadPoolExecutor
+    import deepseek_client
+    if not deepseek_client.is_configured():
+        return
+    def one(a):
+        try:
+            zh = deepseek_client.summarize_zh(a.get("title", ""),
+                                              a.get("body") or a.get("deck", ""))
+            if zh:
+                a["deck"] = zh
+        except Exception:
+            pass
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        list(ex.map(one, articles))
+    log.info("zh summaries applied")
+
+
 def full_refresh(out_dir: Path,
                  config: dict | None = None,
                  max_articles: int = 60) -> dict:
@@ -411,12 +470,15 @@ def full_refresh(out_dir: Path,
     """
     cfg = config or {}
     raw = collect(cfg)
+    raw = _filter_junk(raw)
+    raw = _dedupe_same_story(raw)
     raw = raw[:max_articles]
     log.info("Refresh collected %d articles", len(raw))
     if not raw:
         return {"ok": False, "reason": "no articles"}
 
     articles = [build_article(r) for r in raw]
+    _apply_zh_summaries(articles)
     key = issue_key()
     week = week_label()
     number = dt.date.today().isocalendar()[1]

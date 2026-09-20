@@ -157,11 +157,24 @@ def api_issues():
 @app.get("/api/dict")
 def api_dict(word: str = Query(..., min_length=1),
              sentence: str | None = Query(None)):
-    """用 DeepSeek 释义英文单词,带 sentence 上下文更准。"""
+    """单词速查:云端共享词典(所有用户共用一份) → 未命中才调 LLM 并入库。"""
     word = word.strip().lower()
     if not word:
         raise HTTPException(400, "word is required")
+    ctx = (sentence or "").strip()[:160]
+    ck = f"{word}|{ctx}"   # 与 deepseek_client.lookup_word 的键保持一致
+    try:
+        shared = db.get_shared_gloss(ck)
+        if shared and shared.get("translation"):
+            return shared
+    except Exception as e:
+        log.warning("shared gloss read failed: %s", e)
     info = deepseek_client.lookup_word(word, sentence_context=sentence)
+    if info.get("ok"):
+        try:
+            db.save_shared_gloss(ck, word, info, model=info.get("model") or "")
+        except Exception as e:
+            log.warning("shared gloss save failed: %s", e)
     return info
 
 

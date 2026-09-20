@@ -120,6 +120,40 @@ def ask(question: str,
                 "content": "AI service is temporarily unavailable.", "model": DEFAULT_MODEL}
 
 
+_zh_summary_cache: dict[str, str] = {}
+
+def summarize_zh(title: str, body: str, model: str | None = None) -> str:
+    """GLM 生成一句话中文简介(卡片用)。失败返回空串,调用方回退到英文摘要。"""
+    ck = title
+    if ck in _zh_summary_cache:
+        return _zh_summary_cache[ck]
+    cfg = _cfg("LLM", "DEEPSEEK", "ASK")
+    if not cfg["api_key"]:
+        return ""
+    body_snip = " ".join((body or "").split())[:600]
+    prompt = ('文章标题: ' + title + '\n正文开头: ' + body_snip + '\n'
+              '用一句不超过 40 字的简体中文概括这篇文章讲什么。只输出这句话本身。')
+    try:
+        extra = {}
+        lvl = _env("LLM_THINKING_LEVEL")
+        if lvl:
+            extra["extra_body"] = {"thinking": {"level": lvl}}
+        client = _client(cfg)
+        resp = client.chat.completions.create(
+            model=model or cfg["model"],
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=800, temperature=0.2, **extra)
+        text = (resp.choices[0].message.content or "").strip().splitlines()
+        out = text[0].strip() if text else ""
+        if len(_zh_summary_cache) > 600:
+            _zh_summary_cache.clear()
+        _zh_summary_cache[ck] = out
+        return out
+    except Exception as e:
+        log.warning("summarize_zh failed: %s", e)
+        return ""
+
+
 _lookup_cache: dict[str, dict] = {}   # (word|ctx) → 释义,进程内缓存省 token
 
 def lookup_word(word: str,

@@ -101,6 +101,49 @@ class VocabEntry(Base):
     )
 
 
+class WordGloss(Base):
+    """共享单词释义缓存 — 一个用户查过,所有用户复用(省 token)。"""
+    __tablename__ = "word_gloss"
+    id = Column(Integer, primary_key=True)
+    cache_key = Column(String(220), nullable=False, unique=True)  # word|ctx指纹
+    word = Column(String(128), nullable=False, index=True)
+    translation = Column(Text, default="")
+    phonetic = Column(String(64), default="")
+    model = Column(String(64), default="")
+    hits = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+def get_shared_gloss(cache_key: str):
+    """命中返回 dict,未命中返回 None;命中时 hits+1。"""
+    with get_session_local()() as ses:
+        row = ses.query(WordGloss).filter_by(cache_key=cache_key).first()
+        if not row:
+            return None
+        row.hits = (row.hits or 0) + 1
+        ses.commit()
+        return {"ok": True, "word": row.word, "translation": row.translation or "",
+                "phonetic": row.phonetic or "", "definition_en": "",
+                "examples": [], "cefr_level": "", "model": row.model or "shared"}
+
+
+def save_shared_gloss(cache_key: str, word: str, info: dict, model: str = ""):
+    """存/更新共享释义(仅缓存成功的查询)。"""
+    if not info or not info.get("ok"):
+        return
+    with get_session_local()() as ses:
+        row = ses.query(WordGloss).filter_by(cache_key=cache_key).first()
+        if row:
+            row.translation = info.get("translation") or row.translation
+            row.phonetic = info.get("phonetic") or row.phonetic
+        else:
+            ses.add(WordGloss(cache_key=cache_key, word=word,
+                              translation=info.get("translation") or "",
+                              phonetic=info.get("phonetic") or "", model=model))
+        ses.commit()
+
+
 # ---------- 引擎 + Session ----------
 _engine = None
 _SessionLocal = None
