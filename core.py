@@ -135,6 +135,17 @@ DEFAULT_RSS_SOURCES = [
     {"name": "Aeon",
      "feed": "https://aeon.co/feed.rss",
      "limit": 2, "full_text": True},
+
+    # ---- B1 入门级(专为英语学习者写的分级新闻) ----
+    {"name": "News in Levels",
+     "feed": "https://newsinlevels.com/feed/",
+     "limit": 4, "full_text": True},
+    {"name": "Breaking News English",
+     "feed": "https://breakingnewsenglish.com/rss.xml",
+     "limit": 4, "full_text": True},
+    {"name": "Simple English News",
+     "feed": "https://www.simpleenglishnews.com/feed",
+     "limit": 2, "full_text": True},
 ]
 
 # 无 RSS 的免费源 — 走 HTML 爬取(RSS 已下线的 China Daily 等)
@@ -143,7 +154,7 @@ DEFAULT_HTML_SOURCES = [
      "index_url": "https://www.chinadaily.com.cn/world",
      "link_sel": "a[href*='/a/2']",
      "base_url": "https://www.chinadaily.com.cn",
-     "limit": 3,
+     "limit": 8,
      "title_sel": "h1",
      "body_sel": "#Content"},
 ]
@@ -393,7 +404,7 @@ def write_index_landing(out_dir: Path, issues: list[dict]) -> None:
 
 def full_refresh(out_dir: Path,
                  config: dict | None = None,
-                 max_articles: int = 50) -> dict:
+                 max_articles: int = 60) -> dict:
     """
     一次完整刷新:抓取 → 分级 → 渲染到 out_dir/<issue_key>/ → 更新主页与 archive。
     返回最新一期路径信息。

@@ -185,9 +185,9 @@ _COMMON_PROPER_HINTS = {
 }
 
 
-def _load_whitelist() -> set[str]:
+def _load_whitelist(names: tuple = ("highschool_whitelist.txt", "cet_whitelist.txt")) -> set[str]:
     base: set[str] = set()
-    for name in ("highschool_whitelist.txt", "cet_whitelist.txt"):
+    for name in names:
         path = VOCAB_DIR / name
         if not path.exists():
             continue
