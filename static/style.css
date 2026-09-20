@@ -723,3 +723,17 @@ a:hover { color: var(--accent); }
   max-width: calc(50% - 9px);
   justify-self: center;
 }
+
+/* ---- 分层布局修正:卡片容器独占整行并自身成为网格 ---- */
+.level-block { display: block; }
+.level-block .block-body {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  padding: 20px 0 30px;
+}
+.level-block .block-head { margin-bottom: 2px; }
+@media (max-width: 720px) {
+  .level-block .block-body { grid-template-columns: 1fr; }
+}
