@@ -182,5 +182,6 @@ def lookup_word(word: str,
         return info
     except Exception as e:
         log.warning("lookup_word failed: %s", e)
+        # 把真实原因带出去,便于在页面上直接定位(网络/变量/key 问题一眼可见)
         return {"ok": False, "word": word,
-                "translation": "AI service is temporarily unavailable."}
+                "translation": "LLM error: " + str(e)[:120]}
