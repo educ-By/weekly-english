@@ -1,0 +1,22 @@
+# Render Blueprint — 一键部署
+# 在 Render dashboard 选 "New + Blueprint" 指向此仓库即可。
+services:
+  - type: web
+    name: weekly-english
+    runtime: python
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn server.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DEEPSEEK_API_KEY
+          sync: false          # dashboard 手动填
+      - key: DEEPSEEK_MODEL
+          value: deepseek-flash
+      - key: JWT_SECRET
+          sync: false          # 任意长字符串,部署后立即生成并填入
+      - key: DATABASE_URL
+          sync: false          # Neon 免费 Postgres URL
+      - key: PYTHONUNBUFFERED
+          value: "1"
+      - key: TZ
+          value: Asia/Shanghai

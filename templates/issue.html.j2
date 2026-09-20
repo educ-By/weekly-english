@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{{ issue.title }} · Weekly English</title>
+<link rel="stylesheet" href="static/style.css" />
+</head>
+<body data-page="index">
+
+<header class="masthead">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <span class="logo-mark">W·E</span>
+      <span class="logo-text">Weekly English</span>
+    </a>
+    <nav class="meta">
+      <span>Issue {{ issue.week_label }}</span>
+      <span class="dot"></span>
+      <a class="nav-link" href="archive.html">Archive</a>
+      <span class="dot"></span>
+      <a class="nav-link" id="account-link" href="/auth/login">Sign in</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="cover">
+    <div class="cover-kicker">{{ issue.week_label }} · No. {{ issue.number }}</div>
+    <h1 class="cover-title">{{ issue.title }}</h1>
+    <div class="cover-meta">
+      <span>{{ articles|length }} pieces</span>
+      <span class="dot"></span>
+      <span>{{ counts.B1 }} B1 · {{ counts.B2 }} B2 · {{ counts.C1 }} C1</span>
+    </div>
+  </section>
+
+  <aside class="legend">
+    <span class="legend-label">Vocabulary</span>
+    <span class="legend-item"><span class="dot dot-rare"></span>Out-of-scope words · beyond high-school curriculum</span>
+  </aside>
+
+  <section class="filters" aria-label="Search and filter articles">
+    <div class="filter-row">
+      <label class="search">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <input type="search" id="q" placeholder="Search title or content…" autocomplete="off" />
+      </label>
+
+      <div class="filter-group" data-filter="level">
+        <button class="chip chip-level is-on" data-value="all">All</button>
+        <button class="chip chip-b1" data-value="B1">B1</button>
+        <button class="chip chip-b2" data-value="B2">B2</button>
+        <button class="chip chip-c1" data-value="C1">C1</button>
+      </div>
+
+      <div class="filter-group" data-filter="source">
+        <button class="chip chip-src is-on" data-value="all">All sources</button>
+        {% for s in sources %}<button class="chip chip-src" data-value="{{ s }}">{{ s }}</button>{% endfor %}
+      </div>
+    </div>
+    <p class="filter-status" id="status">Showing {{ articles|length }} of {{ articles|length }}</p>
+  </section>
+
+  <section class="cards">
+    {% for art in articles %}
+    <a class="card card-{{ art.level|lower }}"
+       href="article-{{ art.id }}.html"
+       data-title="{{ art.title }}"
+       data-level="{{ art.level }}"
+       data-source="{{ art.source }}"
+       data-body="{{ art.body_search }}">
+      <div class="card-head">
+        <span class="src">{{ art.source }}</span>
+        <span class="chip chip-{{ art.level|lower }}">{{ art.level }}</span>
+      </div>
+      <h3 class="card-title">{{ art.title }}</h3>
+      <p class="card-deck">{{ art.deck }}</p>
+      <div class="card-foot">
+        <span>{{ art.stats.total_words }} words</span>
+        <span class="dot"></span>
+        <time>{{ art.published_display }}</time>
+      </div>
+    </a>
+    {% endfor %}
+    <p class="empty" id="empty" hidden>No matching articles.</p>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Weekly English · {{ issue.week_label }}</span>
+    <span>Originals preserved verbatim.</span>
+  </div>
+</footer>
+
+<script src="static/app.js"></script>
+</body>
+</html>

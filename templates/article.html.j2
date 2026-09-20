@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{{ article.title }} · Weekly English</title>
+<link rel="stylesheet" href="static/style.css" />
+</head>
+<body data-page="article">
+
+<header class="masthead">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <span class="logo-mark">W·E</span>
+      <span class="logo-text">Weekly English</span>
+    </a>
+    <nav class="meta">
+      <a class="nav-link" href="index.html">← {{ issue.week_label }}</a>
+      <span class="dot"></span>
+      <a class="nav-link" id="account-link" href="/auth/login">Sign in</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <article class="entry" id="article-{{ article.id }}" data-level="{{ article.level }}">
+    <div class="entry-head">
+      <div class="entry-meta">
+        <span class="src">{{ article.source }}</span>
+        <span class="chip chip-{{ article.level|lower }}">{{ article.level }} · {{ article.level_label }}</span>
+        <time>{{ article.published_display }}</time>
+      </div>
+      <h1>{{ article.title }}</h1>
+      {% if article.title_zh %}<p class="title-zh">{{ article.title_zh }}</p>{% endif %}
+      <p class="stats">
+        {{ article.stats.total_words }} words ·
+        avg {{ article.stats.avg_sent_len }} words/sentence ·
+        {{ article.stats.sentences }} sentences ·
+        {{ (article.stats.coverage_b2 * 100) | round(0, 'floor') }}% B2 coverage
+      </p>
+    </div>
+
+    <div class="entry-tools">
+      <button class="btn play-btn" data-target="body-{{ article.id }}" data-lang="en" aria-label="Listen in English">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+          <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span>Listen · English</span>
+      </button>
+      <button class="btn play-btn" data-target="body-{{ article.id }}" data-lang="zh" aria-label="Listen in Mandarin">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+          <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span>Listen · 中文</span>
+      </button>
+
+      <label class="btn upload-btn" data-article="{{ article.id }}">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 4v12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M6 10l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 18v2h16v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span>Upload audio</span>
+        <input type="file" accept="audio/*" hidden />
+      </label>
+    </div>
+
+    <div class="entry-summary">
+      <strong>Excerpt.</strong>
+      {{ article.summary_paragraphs | join(' ') }}
+    </div>
+
+    <div class="entry-body" id="body-{{ article.id }}">
+      {% for p in article.body_paragraphs %}
+      <p>{{ p }}</p>
+      {% endfor %}
+    </div>
+
+    <details class="rare-words">
+      <summary>Out-of-scope vocabulary · {{ article.rare_words|length }} words</summary>
+      <p class="rare-help">
+        Words below are not in the standard high-school / CET-4+6 curriculum.
+        Hover any highlighted word in the article for a quick gloss.
+      </p>
+      <div class="vocab-list">
+        {% for w in article.rare_words %}
+        <button class="vocab-word vocab-rare" data-word="{{ w }}">{{ w }}</button>
+        {% endfor %}
+      </div>
+    </details>
+
+    <p class="src-link">
+      Source ·
+      <a href="{{ article.url }}" target="_blank" rel="noopener">{{ article.url }}</a>
+    </p>
+
+    <div class="ask-mount"></div>
+  </article>
+
+  <p class="back-link"><a href="index.html">← Back to {{ issue.week_label }}</a></p>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Weekly English · {{ issue.week_label }}</span>
+    <span>Originals preserved verbatim.</span>
+  </div>
+</footer>
+
+<script src="static/app.js"></script>
+</body>
+</html>

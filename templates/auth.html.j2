@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{{ title }} · Weekly English</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body data-page="auth" data-mode="{{ mode }}">
+
+<header class="masthead">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <span class="logo-mark">W·E</span>
+      <span class="logo-text">Weekly English</span>
+    </a>
+    <nav class="meta">
+      <a class="nav-link" href="/">← Back to latest issue</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="cover cover-compact">
+    <div class="cover-kicker">Account</div>
+    <h1 class="cover-title">{{ title }}</h1>
+  </section>
+
+  <section class="auth-card">
+    <form id="auth-form" autocomplete="off">
+      <label class="auth-row">
+        <span>Email</span>
+        <input type="email" name="email" required autocomplete="email" />
+      </label>
+      <label class="auth-row">
+        <span>Password</span>
+        <input type="password" name="password" required minlength="8"
+               autocomplete="{{ 'new-password' if mode == 'register' else 'current-password' }}" />
+      </label>
+      <p class="auth-help" id="auth-help"></p>
+      <button class="btn auth-submit" type="submit">
+        {{ 'Sign in' if mode == 'login' else 'Create account' }}
+      </button>
+    </form>
+
+    <p class="auth-switch">
+      {% if mode == 'login' %}
+        New here? <a href="/auth/register">Create an account</a>.
+      {% else %}
+        Already a member? <a href="/auth/login">Sign in</a>.
+      {% endif %}
+    </p>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Weekly English</span>
+    <span>Originals preserved verbatim.</span>
+  </div>
+</footer>
+
+<script src="/static/auth.js"></script>
+</body>
+</html>

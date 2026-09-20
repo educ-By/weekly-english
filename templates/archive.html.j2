@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Archive · Weekly English</title>
+<link rel="stylesheet" href="static/style.css" />
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <span class="logo-mark">W·E</span>
+      <span class="logo-text">Weekly English</span>
+    </a>
+    <nav class="meta">
+      <a class="nav-link" href="index.html">← Latest issue</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="cover cover-compact">
+    <div class="cover-kicker">Archive</div>
+    <h1 class="cover-title">Past issues</h1>
+    <div class="cover-meta">
+      <span>{{ issues|length }} issues</span>
+    </div>
+  </section>
+
+  <section class="archive-list">
+    {% for it in issues %}
+    <a class="archive-row" href="{{ it.path }}">
+      <span class="archive-no">No. {{ it.number }}</span>
+      <span class="archive-week">{{ it.week_label }}</span>
+      <span class="archive-title">{{ it.title }}</span>
+      <span class="archive-count">{{ it.count }} pieces</span>
+      <span class="archive-arrow">→</span>
+    </a>
+    {% endfor %}
+    {% if not issues %}
+    <p class="empty">No previous issues yet. Run <code>run_weekly.py</code> weekly to build an archive.</p>
+    {% endif %}
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Weekly English</span>
+    <span>Originals preserved verbatim.</span>
+  </div>
+</footer>
+
+</body>
+</html>

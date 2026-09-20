@@ -1,0 +1,27 @@
+{
+  "rss": [
+    {
+      "name": "The Economist",
+      "feed": "https://www.economist.com/finance-and-economics/rss.xml",
+      "limit": 4,
+      "full_text": true
+    },
+    {
+      "name": "Reader's Digest",
+      "feed": "https://www.rd.com/feed/",
+      "limit": 4,
+      "full_text": true
+    },
+    {
+      "name": "China Daily",
+      "feed": "https://www.chinadaily.com.cn/rss/world.xml",
+      "limit": 4,
+      "full_text": true
+    }
+  ],
+  "newsapi": {
+    "enabled": false,
+    "queries": []
+  },
+  "html": []
+}
