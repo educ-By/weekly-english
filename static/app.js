@@ -134,10 +134,25 @@
       popup.dataset.sentence = sentenceEl ? sentenceEl.textContent.trim().slice(0, 240) : "";
     }
 
+    let hideTimer = null;
+
+    // 延迟关闭:给鼠标留出从单词移入弹窗的时间;进入弹窗即取消关闭
     function hide() {
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        popup.hidden = true;
+        active = null;
+        hideTimer = null;
+      }, 250);
+    }
+
+    popup.addEventListener("mouseenter", () => {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    });
+    popup.addEventListener("mouseleave", () => {
       popup.hidden = true;
       active = null;
-    }
+    });
 
     function sentenceContext(el) {
       // 取点击词所在句子的原文 — 提高 DeepSeek 释义准确度

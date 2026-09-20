@@ -679,3 +679,6 @@ a:hover { color: var(--accent); }
   body { background: #fff; }
   .entry { box-shadow: none; border-color: #ccc; page-break-inside: avoid; }
 }
+/* ---- 隐藏来源标签(资料来源不对外展示) ---- */
+.src { display: none !important; }
+.filter-group[data-filter="source"] { display: none !important; }
