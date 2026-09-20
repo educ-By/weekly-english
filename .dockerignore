@@ -1,0 +1,13 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+.env
+data/output/
+data/preview/
+data/*.db
+README.backup.md
+uv.log
+uv.err
+render.yaml
+Procfile
