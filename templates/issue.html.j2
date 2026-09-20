@@ -66,28 +66,41 @@
     <p class="filter-status" id="status">Showing {{ articles|length }} of {{ articles|length }}</p>
   </section>
 
-  <section class="cards">
-    {% for art in articles %}
-    <a class="card card-{{ art.level|lower }}"
-       href="article-{{ art.id }}.html"
-       data-title="{{ art.title }}"
-       data-level="{{ art.level }}"
-       data-source="{{ art.source }}"
-       data-body="{{ art.body_search }}">
-      <div class="card-head">
-        <span class="src">{{ art.source }}</span>
-        <span class="chip chip-{{ art.level|lower }}">{{ art.level }}</span>
-      </div>
-      <h3 class="card-title">{{ art.title }}</h3>
-      <p class="card-deck">{{ art.deck }}</p>
-      <div class="card-foot">
-        <span>{{ art.stats.total_words }} words</span>
-        <span class="dot"></span>
-        <time>{{ art.published_display }}</time>
-      </div>
-    </a>
-    {% endfor %}
-    <p class="empty" id="empty" hidden>No matching articles.</p>
+  {% for lvl, label in [("B1", "入门"), ("B2", "进阶"), ("C1", "高阶")] %}
+  {% set group_cards = articles | selectattr("level", "equalto", lvl) | list %}
+  {% if group_cards %}
+  <section class="cards level-block{{ ' is-closed' if lvl != 'B2' else '' }}" data-block="{{ lvl }}">
+    <button class="block-head" type="button" data-toggle-block="{{ lvl }}">
+      <span class="chip chip-{{ lvl|lower }}">{{ lvl }}</span>
+      <span class="block-title">{{ label }}层 · {{ group_cards|length }} 篇</span>
+      <span class="block-caret">▾</span>
+    </button>
+    <div class="block-body">
+      {% for art in group_cards %}
+      <a class="card card-{{ art.level|lower }}"
+         href="article-{{ art.id }}.html"
+         data-title="{{ art.title }}"
+         data-level="{{ art.level }}"
+         data-source="{{ art.source }}"
+         data-body="{{ art.body_search }}">
+        <div class="card-head">
+          <span class="src">{{ art.source }}</span>
+          <span class="chip chip-{{ art.level|lower }}">{{ art.level }}</span>
+        </div>
+        <h3 class="card-title">{{ art.title }}</h3>
+        <p class="card-deck">{{ art.deck }}</p>
+        <div class="card-foot">
+          <span>{{ art.stats.total_words }} words</span>
+          <span class="dot"></span>
+          <time>{{ art.published_display }}</time>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% endfor %}
+  <p class="empty" id="empty" hidden>No matching articles.</p>
   </section>
 
 </main>

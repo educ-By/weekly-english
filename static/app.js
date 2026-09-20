@@ -23,7 +23,9 @@
 
     function apply() {
       const q = (search?.value || "").trim().toLowerCase();
+      const filtering = !!q || level !== "all" || source !== "all";
       let n = 0;
+      const blockVisible = {};
       cards.forEach(card => {
         const title = (card.dataset.title || "").toLowerCase();
         const body = (card.dataset.body || "").toLowerCase();
@@ -34,11 +36,25 @@
         const matchS = source === "all" || src === source;
         const show = matchQ && matchL && matchS;
         card.style.display = show ? "" : "none";
-        if (show) n += 1;
+        if (show) { n += 1; blockVisible[lvl] = (blockVisible[lvl] || 0) + 1; }
+      });
+      // 分层联动:筛选/搜索时自动展开所有层,没有命中内容的层整层隐藏
+      document.querySelectorAll(".level-block").forEach(block => {
+        if (filtering) block.classList.remove("is-closed");
+        const lvl = block.dataset.block || "";
+        block.hidden = filtering && !!lvl && !blockVisible[lvl];
       });
       if (status) status.textContent = `Showing ${n} of ${cards.length}`;
       if (empty) empty.hidden = n !== 0;
     }
+
+    // 层标题点击 = 折叠/展开该层
+    document.querySelectorAll("[data-toggle-block]").forEach(head => {
+      head.addEventListener("click", () => {
+        const block = head.closest(".level-block");
+        if (block) block.classList.toggle("is-closed");
+      });
+    });
 
     document.querySelectorAll('.filter-group[data-filter="level"] .chip')
       .forEach(btn => btn.addEventListener("click", () => {

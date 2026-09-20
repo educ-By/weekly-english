@@ -682,3 +682,28 @@ a:hover { color: var(--accent); }
 /* ---- 隐藏来源标签(资料来源不对外展示) ---- */
 .src { display: none !important; }
 .filter-group[data-filter="source"] { display: none !important; }
+
+/* ---- 主页分层:按难度折叠区块 ---- */
+.level-block { margin-bottom: 8px; }
+.level-block .block-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: 1px solid var(--line, #ddd);
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.level-block .block-head:hover { border-color: var(--ink, #333); }
+.level-block .block-title { font-weight: 600; }
+.level-block .block-caret {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+.level-block.is-closed .block-caret { transform: rotate(-90deg); }
+.level-block.is-closed .block-body { display: none; }
