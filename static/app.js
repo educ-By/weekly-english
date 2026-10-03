@@ -275,9 +275,9 @@
         setVocabContext(word, def, tr);
         const html =
           `<div class="vp-word">${escapeHtml(info.word)}` +
-          `<button class="vp-close" data-close-popup title="Close">✕</button>` +
           (info.phonetic ? `<span class="vp-phon">${escapeHtml(info.phonetic)}</span>` : "") +
           (info.cefr_level ? `<span class="vp-level">${escapeHtml(info.cefr_level)}</span>` : "") +
+          `<button class="vp-close" data-close-popup title="Close">✕</button>` +
           `</div>` +
           (def ? `<div class="vp-trans">${escapeHtml(def)}</div>` : "") +
           (tr && tr !== def ? `<div class="vp-trans">${escapeHtml(tr)}</div>` : "") +

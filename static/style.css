@@ -750,3 +750,7 @@ a:hover { color: var(--accent); }
 
 /* ---- 词典查询加载态 ---- */
 .vocab-popup .vp-loading { color: var(--muted, #6b6f78); font-style: italic; }
+
+/* ---- 弹窗头行:单词/音标靠左,✕ 靠最右 ---- */
+.vocab-popup .vp-word { justify-content: flex-start; align-items: baseline; gap: 8px; }
+.vocab-popup .vp-word .vp-close { margin-left: auto; }
