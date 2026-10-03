@@ -65,6 +65,15 @@ def _cfg(*groups: str) -> dict:
             "model": DEFAULT_MODEL, "group": None}
 
 
+def _thinking_extra(cfg: dict) -> dict:
+    """仅智谱端点才注入 thinking 参数 — DeepSeek 等端点发送未知参数会报错。
+    当前全部接口走 DeepSeek:LLM_THINKING_LEVEL 不设(或端点非智谱)即不发送。"""
+    lvl = _env("LLM_THINKING_LEVEL")
+    if lvl and "bigmodel" in (cfg.get("base_url") or ""):
+        return {"extra_body": {"thinking": {"level": lvl}}}
+    return {}
+
+
 def is_configured() -> bool:
     return bool(_cfg("LLM", "ASK", "DEEPSEEK")["api_key"])
 
@@ -139,10 +148,7 @@ def summarize_zh(title: str, body: str, model: str | None = None) -> str:
     prompt = ('文章标题: ' + title + '\n正文开头: ' + body_snip + '\n'
               '用一句不超过 40 字的简体中文概括这篇文章讲什么。只输出这句话本身。')
     try:
-        extra = {}
-        lvl = _env("LLM_THINKING_LEVEL")
-        if lvl:
-            extra["extra_body"] = {"thinking": {"level": lvl}}
+        extra = _thinking_extra(cfg)
         client = _client(cfg)
         out = ""
         for attempt in range(3):   # 失败/无中文输出时重试;最后一次仅用标题
@@ -204,11 +210,8 @@ def lookup_word(word: str,
     )
     try:
         client = _client(cfg)
-        # 思考型模型(如智谱 GLM):可配 LLM_THINKING_LEVEL=low 控制思考档位省 token
-        extra = {}
-        lvl = _env("LLM_THINKING_LEVEL")
-        if lvl:
-            extra["extra_body"] = {"thinking": {"level": lvl}}
+        # 仅智谱端点会注入 thinking 参数;DeepSeek 不发送
+        extra = _thinking_extra(cfg)
         import json as _json, re as _re
         data, text = {}, ""
         for attempt in range(2):
