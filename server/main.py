@@ -19,10 +19,11 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Query, Request, Depends
+from fastapi import FastAPI, HTTPException, Query, Request, Depends, Response
 from fastapi.responses import (HTMLResponse, FileResponse, JSONResponse,
                                RedirectResponse)
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
@@ -43,6 +44,7 @@ _TPL_ENV = Environment(
     autoescape=select_autoescape(["html"]),
     trim_blocks=True, lstrip_blocks=True,
 )
+_TPL_ENV.globals["asset"] = core.asset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,11 +58,13 @@ app = FastAPI(title="Weekly English", version="1.0.0")
 from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
-# 静态资源缓存:带版本参数时浏览器可长缓存,减少重复下载
+# 静态资源缓存:文件名带 ?v=<版本号>,版本号一变 URL 就变,所以可以放心长缓存。
+# 版本号由 core.ASSET_VERSIONS 统一管理,模板用 asset() 生成,改 static/ 后
+# 启动时 core.refresh_asset_versions() 会就地重写已渲染页面里的引用。
 class CachedStatic(StaticFiles):
     def file_response(self, *args, **kwargs):
         resp = super().file_response(*args, **kwargs)
-        resp.headers["Cache-Control"] = "public, max-age=300"
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return resp
 
 app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
@@ -101,8 +105,40 @@ def _latest_issue_key() -> Optional[str]:
     return issues[0]["key"] if issues else None
 
 
+# 预渲染成品页的读盘缓存:path → (mtime_ns, size, text)。
+# 一期目录页 180~220KB,同一份文件被反复读盘纯属浪费;顺手带上 ETag,
+# 浏览器后退/来回点文章时走 304,不用重下整篇文档。
+_html_cache: dict[str, tuple[tuple[int, int], str]] = {}
+
+
+def _html_response(path: Path, request: Request) -> Response:
+    """把磁盘上的成品页返回给浏览器(内存缓存 + ETag/304)。"""
+    try:
+        st = path.stat()
+    except OSError:
+        raise HTTPException(404, "Not Found")
+    stamp = (st.st_mtime_ns, st.st_size)
+    etag = f'W/"{stamp[0]:x}-{stamp[1]:x}"'
+
+    cached = _html_cache.get(str(path))
+    if cached and cached[0] == stamp:
+        text = cached[1]
+    else:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            raise HTTPException(404, "Not Found")
+        _html_cache[str(path)] = (stamp, text)
+
+    # no-cache = 每次都回来问一句,而不是不许缓存 —— 配合 ETag 才能命中 304
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return HTMLResponse(text, headers=headers)
+
+
 @app.get("/", response_class=HTMLResponse)
-def index():
+def index(request: Request):
     """首页门户 —— 独立于最新一期的 /issue/{key}。"""
     path = OUT_DIR / "index.html"
     # catalog.json 缺失说明卷上还是改造前的旧版静态页 —— 就地重建,不必重新联网抓取
@@ -122,17 +158,17 @@ def index():
             )
     if not path.exists():
         raise HTTPException(404, "Home page missing.")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return _html_response(path, request)
 
 
 @app.get("/archive", response_class=HTMLResponse)
-def archive():
+def archive(request: Request):
     path = OUT_DIR / "archive.html"
     if not path.exists():
         # 无 archive 时先空生成一份
         issues = core.scan_issues(OUT_DIR)
         core.write_index_landing(OUT_DIR, issues)
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return _html_response(path, request)
 
 
 @app.get("/issue/latest")
@@ -148,7 +184,7 @@ def issue_latest():
 
 
 @app.get("/issue/article-{article_id}.html", response_class=HTMLResponse)
-def article_under_issue_prefix(article_id: str):
+def article_under_issue_prefix(article_id: str, request: Request):
     """/issue/2026-W38 页上的相对链接会解析成 /issue/article-x.html — 回落最新一期。"""
     issues = core.scan_issues(OUT_DIR)
     if not issues:
@@ -156,7 +192,7 @@ def article_under_issue_prefix(article_id: str):
     path = OUT_DIR / issues[0]["key"] / f"article-{article_id}.html"
     if not path.exists():
         raise HTTPException(404, "Article not found")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return _html_response(path, request)
 
 
 @app.get("/issue/static/{file_path:path}")
@@ -169,19 +205,19 @@ def issue_prefix_static(file_path: str):
 
 
 @app.get("/issue/{key}", response_class=HTMLResponse)
-def issue_index(key: str):
+def issue_index(key: str, request: Request):
     path = OUT_DIR / key / "index.html"
     if not path.exists():
         raise HTTPException(404, f"Issue {key} not found")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return _html_response(path, request)
 
 
 @app.get("/article/{issue_key}/{article_id}", response_class=HTMLResponse)
-def article(issue_key: str, article_id: str):
+def article(issue_key: str, article_id: str, request: Request):
     path = OUT_DIR / issue_key / f"article-{article_id}.html"
     if not path.exists():
         raise HTTPException(404, "Article not found")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return _html_response(path, request)
 
 
 # ---------- 渲染页兜底路由 ----------
@@ -189,22 +225,22 @@ def article(issue_key: str, article_id: str):
 # 在 file:// 本地预览下可用;以下兜底路由让同样的链接在服务器 URL 下也能命中。
 
 @app.get("/issue/{issue_key}/article-{article_id}.html", response_class=HTMLResponse)
-def article_in_issue(issue_key: str, article_id: str):
+def article_in_issue(issue_key: str, article_id: str, request: Request):
     path = OUT_DIR / issue_key / f"article-{article_id}.html"
     if not path.exists():
         raise HTTPException(404, "Article not found")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return _html_response(path, request)
 
 
 @app.get("/article-{article_id}.html", response_class=HTMLResponse)
-def article_latest(article_id: str):
+def article_latest(article_id: str, request: Request):
     issues = core.scan_issues(OUT_DIR)
     if not issues:
         raise HTTPException(404, "No issues rendered yet")
     path = OUT_DIR / issues[0]["key"] / f"article-{article_id}.html"
     if not path.exists():
         raise HTTPException(404, "Article not found")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return _html_response(path, request)
 
 
 # ---------- 跨期浏览:/level 与 /search ----------
@@ -362,16 +398,26 @@ def api_dict(request: Request,
     return info
 
 
+class AskIn(BaseModel):
+    question: str = ""
+    issue_key: str | None = None
+
+
 @app.post("/api/ask")
-async def api_ask(request: Request):
-    """用户提问(严格限制到本周文章 + 英语学习)。"""
-    body = await request.json()
-    question = (body.get("question") or "").strip()
+def api_ask(payload: AskIn, request: Request):
+    """用户提问(严格限制到本周文章 + 英语学习)。
+
+    注意这里必须是同步 def。里面的 deepseek_client.ask 是阻塞式的 HTTP 调用,
+    写在 async def 里会把事件循环占住 —— 单 worker 部署下,只要有一个人在提问,
+    全站所有请求(包括 HTML/CSS/JS)都得排队等它返回。同步 def 会被 FastAPI
+    丢进线程池执行,顺带也不再卡住同一路由里的同步 sqlite 调用。
+    """
+    question = (payload.question or "").strip()
     if not question:
         raise HTTPException(400, "question is required")
     if _quota_exceeded("deepseek", request):
         return {"ok": False, "refused": False, "content": "本月 AI 额度已用完,下月自动恢复。"}
-    issue_key = body.get("issue_key") or _latest_issue_key()
+    issue_key = payload.issue_key or _latest_issue_key()
     articles = _load_articles_context(issue_key) if issue_key else []
     info = deepseek_client.ask(question, context_articles=articles)
     _record_usage("deepseek", info.get("usage_tokens") or 0, request)
@@ -614,21 +660,34 @@ def list_history(limit: int = Query(60, ge=1, le=500),
 
 
 # ---------- 辅助 ----------
+_articles_ctx_cache: dict[str, tuple[float, list[dict]]] = {}
+
+
 def _load_articles_context(issue_key: str) -> list[dict]:
-    """从本期索引里抽出文章的标题/URL/来源,作为 LLM 上下文。"""
-    issues = core.scan_issues(OUT_DIR)
-    target = next((i for i in issues if i["key"] == issue_key), None)
-    if not target:
-        return []
+    """从本期索引里抽出文章的标题/URL/来源,作为 LLM 上下文。
+
+    每次提问都重读 + 正则扫一遍本期全部文章 HTML 是白费力气,内容没变就直接复用。
+    失效靠 meta.json 的 mtime:每次重渲染都会重写它(只覆盖同名文件的话目录
+    mtime 是不动的,不能拿来当判据)。
+    """
     issue_dir = OUT_DIR / issue_key
-    out = []
-    for p in issue_dir.glob("article-*.html"):
+    meta_path = issue_dir / "meta.json"
+    try:
+        stamp = meta_path.stat().st_mtime if meta_path.exists() else issue_dir.stat().st_mtime
+    except OSError:
+        return []
+
+    hit = _articles_ctx_cache.get(issue_key)
+    if hit and hit[0] == stamp:
+        return hit[1]
+
+    out: list[dict] = []
+    for p in sorted(issue_dir.glob("article-*.html")):
         try:
             txt = p.read_text(encoding="utf-8")
-            import re as _re
-            title_m = _re.search(r"<h1>([^<]+)</h1>", txt)
-            src_m = _re.search(r'class="src">([^<]+)</span>', txt)
-            url_m = _re.search(r'href="(https?://[^"]+)"', txt)
+            title_m = re.search(r"<h1>([^<]+)</h1>", txt)
+            src_m = re.search(r'class="src">([^<]+)</span>', txt)
+            url_m = re.search(r'href="(https?://[^"]+)"', txt)
             out.append({
                 "title": title_m.group(1).strip() if title_m else "",
                 "source": src_m.group(1).strip() if src_m else "",
@@ -636,11 +695,19 @@ def _load_articles_context(issue_key: str) -> list[dict]:
             })
         except Exception:
             continue
+    _articles_ctx_cache[issue_key] = (stamp, out)
     return out
 
 
 # ---------- 启动时不阻塞:后台线程做初始抓取 ----------
 def _background_refresh_once():
+    # 0) 磁盘上现成的页面引用的是渲染那一刻的资源版本号 —— 先就地改写,
+    #    免得浏览器继续用缓存里的旧 app.js / style.css(不联网,很快)
+    try:
+        core.refresh_asset_versions(OUT_DIR)
+    except Exception as e:
+        log.warning("Asset version refresh failed: %s", e)
+
     # 1) 改造前生成的期没有 meta.json —— 就地从它们自己的 HTML 重渲染,保证全站模板一致
     try:
         rebuilt = core.rebuild_legacy_issues(OUT_DIR)
@@ -683,6 +750,7 @@ def _scheduled_refresh():
     try:
         log.info("Scheduled weekly refresh starting...")
         result = core.full_refresh(OUT_DIR)
+        core.refresh_asset_versions(OUT_DIR)   # 老期不会因这次抓取重渲染,版本号得单独补
         log.info("Scheduled refresh done: %s", result)
     except Exception as e:
         log.warning("Scheduled refresh failed: %s", e)

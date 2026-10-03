@@ -136,7 +136,7 @@ a:hover { color: var(--accent); }
   border-radius: 999px;
   padding: 8px 16px;
   background: #fff;
-  transition: border-color .15s ease;
+  transition: border-color var(--dur) var(--ease);
 }
 .search:focus-within { border-color: var(--accent); }
 .search .ico { width: 16px; height: 16px; color: var(--muted); flex: none; }
@@ -160,9 +160,13 @@ a:hover { color: var(--accent); }
   font-weight: 600;
   cursor: pointer;
   font-family: var(--font-sans);
-  transition: border-color .12s, background .12s, color .12s;
+  transition: border-color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
 }
 .chip:hover { border-color: var(--accent); }
+.chip:active { transform: translateY(1px); }
 .chip.is-on {
   background: var(--ink); color: var(--paper); border-color: var(--ink);
 }
@@ -195,7 +199,9 @@ a:hover { color: var(--accent); }
   display: flex; flex-direction: column;
   min-height: 200px;
   position: relative;
-  transition: border-color .15s ease, transform .15s ease;
+  transition: border-color var(--dur) var(--ease),
+              transform var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease);
 }
 .card::before {
   content: ""; position: absolute; top: 0; left: 24px; right: 24px;
@@ -205,7 +211,11 @@ a:hover { color: var(--accent); }
 .card-b1::before { background: var(--b1); }
 .card-b2::before { background: var(--b2); }
 .card-c1::before { background: var(--c1); }
-.card:hover { border-color: var(--accent); }
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -18px rgba(0,0,0,.32);
+}
 .card:hover .card-title { color: var(--accent); }
 .card-head {
   display: flex; justify-content: space-between; align-items: center;
@@ -219,7 +229,7 @@ a:hover { color: var(--accent); }
   font-family: var(--font-serif);
   font-size: 22px; line-height: 1.28;
   font-weight: 600; margin: 0 0 8px;
-  transition: color .15s ease;
+  transition: color var(--dur) var(--ease);
 }
 .card-deck {
   font-family: var(--font-serif);
@@ -260,7 +270,7 @@ a:hover { color: var(--accent); }
 .archive-row:hover .archive-title { color: var(--accent); }
 .archive-no { color: var(--muted); font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
 .archive-week { color: var(--accent); font-size: 13px; }
-.archive-title { font-size: 22px; line-height: 1.3; transition: color .15s; }
+.archive-title { font-size: 22px; line-height: 1.3; transition: color var(--dur) var(--ease); }
 .archive-count { font-size: 13px; color: var(--muted); }
 .archive-arrow { color: var(--muted); }
 
@@ -325,7 +335,9 @@ a:hover { color: var(--accent); }
   border-radius: 999px;
   font-size: 13px; cursor: pointer;
   font-family: var(--font-sans);
-  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  transition: transform var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
 }
 .btn:hover { background: var(--paper-2); border-color: var(--accent); }
 .btn:active { transform: translateY(1px); }
@@ -363,7 +375,7 @@ a:hover { color: var(--accent); }
   border-bottom: 1.5px dotted var(--c-rare);
   color: inherit;
   background: transparent;
-  transition: background .15s ease;
+  transition: background var(--dur) var(--ease);
 }
 .entry-body .rare:hover {
   background: rgba(107,77,143,.12);
@@ -381,8 +393,10 @@ body.is-selecting { cursor: text; }
 }
 .sel-layer .sel-rect {
   position: absolute;
+  top: 0; left: 0;            /* 定位坐标统一走 transform(合成层),不再写 left/top */
   background: rgba(107,77,143,.22);
   border-radius: 2px;
+  will-change: transform;
 }
 
 /* vocab popup — hover/click gloss
@@ -453,12 +467,16 @@ body.is-selecting { cursor: text; }
 .rare-words summary {
   cursor: pointer; font-size: 13px; color: var(--muted);
   letter-spacing: 0.02em;
-}
+  /* 下面这几条原本是没有选择器的悬空声明,被 CSS 解析器整段丢掉 ——
+     挂回 summary 自己身上,让它真的成为一个可点的胶囊 */
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 3px 8px;
   font-family: var(--font-serif);
+  transition: border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
 }
+.rare-words summary:hover { border-color: var(--accent); color: var(--ink); }
 
 .src-link {
   margin-top: 22px;
@@ -888,6 +906,26 @@ body.is-selecting { cursor: text; }
 }
 @keyframes page-in { from { opacity: 0; } }
 
+/* ---- 卡片首帧入场:同屏卡片错峰淡入 ----
+   只在页面加载时播一次 —— 筛选和折叠是用户的主动操作,再放一遍只会显得拖沓。
+   延迟封顶 8 档 × 26ms,一期五十多张卡也不会排到一秒之后。
+   这里用 backwards 而不是 both:both 会让动画结束后的 transform:none 一直压着
+   普通声明,把 .card:hover 的抬升整个吃掉。 */
+.card { animation: card-in var(--dur-slow) var(--ease) backwards; }
+.card:nth-child(2)   { animation-delay: 26ms; }
+.card:nth-child(3)   { animation-delay: 52ms; }
+.card:nth-child(4)   { animation-delay: 78ms; }
+.card:nth-child(5)   { animation-delay: 104ms; }
+.card:nth-child(6)   { animation-delay: 130ms; }
+.card:nth-child(7)   { animation-delay: 156ms; }
+.card:nth-child(8)   { animation-delay: 182ms; }
+.card:nth-child(n+9) { animation-delay: 208ms; }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
 /* ---- 系统级「减少动态效果」必须真正生效 ----
    放在文件最后,以便盖掉上面所有过渡;动画仍会瞬间走完终态,
    不会把元素卡在 opacity:0。 */
@@ -962,7 +1000,7 @@ body.is-selecting { cursor: text; }
   border: 1px solid var(--line); border-radius: 999px;
   padding: 6px 14px; width: 170px; outline: none;
   color: var(--ink); background: #fff;
-  transition: border-color .15s ease;
+  transition: border-color var(--dur) var(--ease);
 }
 /* 聚焦只换边框色 —— 不再加宽(加宽会把 masthead 挤到折行、内容整块往下跳) */
 .nav-search input:focus { border-color: var(--accent); }
@@ -1067,7 +1105,7 @@ body.is-selecting { cursor: text; }
   display: flex; flex-direction: column; gap: 8px;
   background: #fff; border: 1px solid var(--line); border-radius: 8px;
   padding: 24px 22px 20px;
-  transition: border-color .15s ease;
+  transition: border-color var(--dur) var(--ease);
 }
 .level-card::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0;
@@ -1123,7 +1161,7 @@ body.is-selecting { cursor: text; }
 }
 .toc-item:last-child { border-bottom: 1px solid var(--line); }
 .toc-no { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.toc-link { font-size: 17px; line-height: 1.35; transition: color .15s; }
+.toc-link { font-size: 17px; line-height: 1.35; transition: color var(--dur) var(--ease); }
 .toc-link:hover { color: var(--accent); }
 .toc-words, .toc-time {
   font-family: var(--font-sans); font-size: 12px; color: var(--muted);
@@ -1172,7 +1210,7 @@ a.vocab-word:hover { color: var(--c-rare); }
   display: flex; flex-direction: column; gap: 4px;
   background: #fff; border: 1px solid var(--line); border-radius: 8px;
   padding: 14px 18px;
-  transition: border-color .15s ease;
+  transition: border-color var(--dur) var(--ease);
 }
 .pager-item:hover { border-color: var(--accent); }
 .pager-next { text-align: right; }
@@ -1222,7 +1260,7 @@ a.vocab-word:hover { color: var(--c-rare); }
 .result-row:last-child { border-bottom: 1px solid var(--line); }
 .result-meta { display: flex; align-items: center; gap: 10px; }
 .result-issue { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
-.result-title { font-family: var(--font-serif); font-size: 21px; line-height: 1.3; transition: color .15s; }
+.result-title { font-family: var(--font-serif); font-size: 21px; line-height: 1.3; transition: color var(--dur) var(--ease); }
 .result-row:hover .result-title { color: var(--accent); }
 .result-deck {
   font-family: var(--font-serif);

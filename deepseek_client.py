@@ -78,12 +78,17 @@ def is_configured() -> bool:
     return bool(_cfg("LLM", "ASK", "DEEPSEEK")["api_key"])
 
 
-def _client(cfg: dict):
+def _client(cfg: dict, timeout: float = 30.0):
+    """注意:这里创建的客户端是阻塞式的,调用方必须跑在线程里(同步路由),
+    不能放在 async 路由里直接调 —— 会把事件循环占死。"""
     try:
         from openai import OpenAI  # type: ignore
     except ImportError as e:
         raise RuntimeError("openai package missing; pip install openai>=1.0") from e
-    return OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+    # 必须带超时:上游挂住时没有超时就是无限等,调用方(线程池)会被一个个拖干,
+    # 整站跟着变慢。重试交给 openai 自己的退避,只重试 1 次。
+    return OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"],
+                  timeout=timeout, max_retries=1)
 
 
 def ask(question: str,
@@ -115,7 +120,7 @@ def ask(question: str,
     messages.append({"role": "user", "content": question.strip()})
 
     try:
-        client = _client(cfg)
+        client = _client(cfg, timeout=60.0)   # 问答要生成一整段,给足时间
         resp = client.chat.completions.create(
             model=model or cfg["model"],
             messages=messages,
@@ -209,7 +214,7 @@ def lookup_word(word: str,
         '只输出一行 JSON:{"phonetic":"英式音标","zh":"本句义,不超过15字","pos":"词性"}'
     )
     try:
-        client = _client(cfg)
+        client = _client(cfg, timeout=20.0)   # 单词释义很短,超时就换在线词典退路
         # 仅智谱端点会注入 thinking 参数;DeepSeek 不发送
         extra = _thinking_extra(cfg)
         import json as _json, re as _re

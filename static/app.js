@@ -214,11 +214,41 @@
     const cache = new Map();   // word → lookup promise
     let active = null;
 
+    // 动画参数从 CSS 令牌里读一次,不另写一份时长/缓动
+    const rootStyle = getComputedStyle(document.documentElement);
+    const durMs = (name, fallback) =>
+      (parseFloat(rootStyle.getPropertyValue(name)) || fallback) * 1000;
+    const POP_EASE = (rootStyle.getPropertyValue("--ease") || "").trim()
+                     || "cubic-bezier(0.22,0.61,0.36,1)";
+
+    // 弹窗与状态条常驻同一个 DOM、只改内容,所以每次显示都要重放一遍淡入。
+    // 用 WAAPI 而不是"摘类名 → 读 offsetWidth → 加类名":后者得靠一次强制重排
+    // 才能让动画重播,每次悬停/每次提示都白搭一次布局。
+    function replayPopIn(el, holder, duration) {
+      if (prefersReducedMotion()) return;
+      if (!el.animate) {                    // 老浏览器退回类名重放
+        el.classList.remove("is-in");
+        void el.offsetWidth;
+        el.classList.add("is-in");
+        return;
+      }
+      if (holder.anim) holder.anim.cancel();
+      holder.anim = el.animate(
+        [{ opacity: 0, transform: "translateY(3px) scale(0.985)" },
+         { opacity: 1, transform: "none" }],
+        { duration, easing: POP_EASE });
+    }
+
+    const popupAnim = { anim: null };
+    const popIn = () => replayPopIn(popup, popupAnim, durMs("--dur-fast", 0.13));
+
     function showAt(target, text) {
       const r = (target && typeof target.getBoundingClientRect === "function")
         ? target.getBoundingClientRect() : target;
       popup.innerHTML = text;
       popup.hidden = false;
+      // 唯一一次强制布局:量尺寸用来居中和按视口夹取。写完内容必须量一次,
+      // 省不掉;原来这里后面还有一次,是为了重放动画,已经交给 WAAPI 了。
       const pw = popup.offsetWidth;
       const ph = popup.offsetHeight;
       const sx = window.scrollX || 0;
@@ -234,11 +264,7 @@
 
       popup.style.left = x + "px";
       popup.style.top = y + "px";
-      // 弹窗复用同一个 DOM,只改 left/top —— 不重放动画的话,连续悬停时它会瞬移到新位置。
-      // 强制一次重排让动画能重新触发(re-trigger 的标准做法)。
-      popup.classList.remove("is-in");
-      void popup.offsetWidth;
-      popup.classList.add("is-in");
+      popIn();
     }
 
     // 把当前文章上下文写到 popup 上,供"加入生词本"按钮使用
@@ -455,6 +481,7 @@
 
     // ---- 翻译引擎状态提示(右下角轻量浮动条) ----
     let toastBox = null, toastTimer = null, toastKind = "";
+    const toastAnim = { anim: null };
 
     function toast(text, kind, autoHide) {
       if (!toastBox) {
@@ -469,9 +496,7 @@
       toastBox.classList.toggle("is-err", kind === "err");
       toastBox.classList.toggle("is-ok", kind === "ok");
       // 状态条常驻 DOM、靠 hidden 反复开关,重放一次淡入免得每次都硬蹦出来
-      toastBox.classList.remove("is-in");
-      void toastBox.offsetWidth;
-      toastBox.classList.add("is-in");
+      replayPopIn(toastBox, toastAnim, durMs("--dur", 0.18));
       clearTimeout(toastTimer);
       if (autoHide) toastTimer = setTimeout(() => { toastBox.hidden = true; }, autoHide);
     }
@@ -630,7 +655,30 @@
     let selecting = false;
     let longPress = null;
     const bodyEl = article.querySelector(".entry-body");
-    const clearSel = () => { selLayer.innerHTML = ""; };
+
+    // 选区矩形节点池 —— 拖选时每帧复用同一批 div,只改 transform 和尺寸。
+    // 原先每帧先 selLayer.innerHTML="" 再重建,一秒能造/扔上百个节点。
+    const rectPool = [];
+    let rectCount = 0;
+
+    function rectAt(i) {
+      let d = rectPool[i];
+      if (!d) {
+        d = document.createElement("div");
+        d.className = "sel-rect";
+        d.style.display = "none";
+        selLayer.appendChild(d);
+        rectPool[i] = d;
+      }
+      return d;
+    }
+
+    function setRectCount(n) {
+      for (let i = n; i < rectCount; i++) rectPool[i].style.display = "none";
+      rectCount = n;
+    }
+
+    const clearSel = () => setRectCount(0);
 
     function caretRangeAt(x, y) {
       if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
@@ -650,15 +698,23 @@
       return !!(el && bodyEl.contains(el));
     }
     function paintRange(range) {
-      clearSel();
       const sx = window.scrollX || 0, sy = window.scrollY || 0;
+      // 先把几何一次性读完,再统一写样式 —— 读写分离,不让浏览器夹在中间反复重排
+      const boxes = [];
       for (const r of range.getClientRects()) {
         if (r.width < 1 || r.height < 1) continue;
-        const d = document.createElement("div");
-        d.className = "sel-rect";
-        d.style.cssText = `left:${r.left + sx}px;top:${r.top + sy}px;width:${r.width}px;height:${r.height}px`;
-        selLayer.appendChild(d);
+        boxes.push(r);
       }
+      for (let i = 0; i < boxes.length; i++) {
+        const r = boxes[i];
+        const d = rectAt(i);
+        d.style.transform =
+          `translate(${Math.round(r.left + sx)}px, ${Math.round(r.top + sy)}px)`;
+        d.style.width = r.width + "px";
+        d.style.height = r.height + "px";
+        d.style.display = "";
+      }
+      setRectCount(boxes.length);
     }
     function beginSelect(x, y) {
       const r = caretRangeAt(x, y);
@@ -689,12 +745,65 @@
       activeSel = range;
       paintRange(range);
     }
-    function endSelect() {
+    // 拖选期间把指针位置攒起来,一帧只算一次。
+    // pointermove 一秒能来上百个,每个都做一次 caretRangeFromPoint 命中测试(强制布局)
+    // 再重画一遍选区,这就是拖选"发涩"的根源。
+    let pendingPoint = null;
+    let selectFrame = 0;
+
+    function flushSelect() {
+      if (selectFrame) { cancelAnimationFrame(selectFrame); selectFrame = 0; }
+      const p = pendingPoint;
+      pendingPoint = null;
+      // 只在拖选进行中补画:双击选词是另一条路径,别用积压的拖拽点把它覆盖掉
+      if (p && selecting) updateSelect(p.x, p.y);
+    }
+
+    function scheduleSelect(x, y) {
+      pendingPoint = { x, y };
+      if (selectFrame) return;
+      selectFrame = requestAnimationFrame(() => {
+        selectFrame = 0;
+        const p = pendingPoint;
+        pendingPoint = null;
+        if (p) updateSelect(p.x, p.y);
+      });
+    }
+
+    // 拖到窗口上下边缘时自动滚屏 —— 长段落一口气拖不到底,不滚就等于选不中
+    const EDGE_PX = 56;        // 离边缘多近开始滚
+    const EDGE_SPEED = 12;     // 每帧滚多少像素
+    let lastX = 0, lastY = 0;
+    let autoDir = 0;           // -1 向上, +1 向下, 0 不动
+    let autoFrame = 0;
+
+    function autoScrollTick() {
+      autoFrame = 0;
+      if (!selecting || !autoDir) return;
+      const before = window.scrollY;
+      window.scrollBy(0, autoDir * EDGE_SPEED);
+      if (window.scrollY === before) { autoDir = 0; return; }  // 已经到顶/到底,停
+      scheduleSelect(lastX, lastY);   // 屏幕点位没变,底下的文字换了 → 选区跟着延伸
+      autoFrame = requestAnimationFrame(autoScrollTick);
+    }
+
+    function stopAutoScroll() {
+      autoDir = 0;
+      if (autoFrame) { cancelAnimationFrame(autoFrame); autoFrame = 0; }
+    }
+
+    // force 供"双击选词"使用:那条路径不经过拖选,走到这里时 selecting 早被 pointerup
+    // 置成 false 了,于是下面直接 return —— 结果是双击只画出高亮、取词工具条永远不出现
+    // (普通词尤其明显:点了完全没反应)。判断写成 === true,因为本函数还直接挂在
+    // pointerup/pointercancel 上当监听器用,那里第一个参数是事件对象(truthy)。
+    function endSelect(force) {
+      flushSelect();          // 补上最后一帧还没画的选区,终点不能丢
+      stopAutoScroll();
       const was = selecting;
       selecting = false;
       document.body.classList.remove("is-selecting");
       if (longPress) { clearTimeout(longPress); longPress = null; }
-      if (!was) return;                    // 只在一次真正拖选结束时动作,避免误触复发
+      if (!was && force !== true) return;   // 只在一次真正拖选结束时动作,避免误触复发
       if (!activeSel) { clearSel(); return; }
       const raw = activeSel.toString().replace(/\s+/g, " ").trim();
       // 只要含英文字母、且不含中日韩文字即可 —— 允许标点(逗号/斜杠/引号/括号等)
@@ -772,7 +881,14 @@
         beginSelect(e.clientX, e.clientY);
       });
       bodyEl.addEventListener("pointermove", e => {
-        if (selecting) { updateSelect(e.clientX, e.clientY); return; }
+        if (selecting) {
+          lastX = e.clientX; lastY = e.clientY;
+          scheduleSelect(e.clientX, e.clientY);
+          const h = window.innerHeight;
+          autoDir = e.clientY < EDGE_PX ? -1 : (e.clientY > h - EDGE_PX ? 1 : 0);
+          if (autoDir && !autoFrame) autoFrame = requestAnimationFrame(autoScrollTick);
+          return;
+        }
         if (longPress) { clearTimeout(longPress); longPress = null; }  // 一动即视为滚动
       });
       // 触摸划词期间阻止页面滚动(必须非 passive 才能 preventDefault)
@@ -794,8 +910,9 @@
         range.setEnd(t, en);
         activeSel = range;
         paintRange(range);
-        endSelect();
+        endSelect(true);      // true = 这条路径不是拖选,但同样要弹出取词工具条
       });
+      // 注意:这两处直接挂监听器,回调会收到事件对象 —— endSelect 内部用 === true 区分
       window.addEventListener("pointerup", endSelect);
       window.addEventListener("pointercancel", endSelect);
     }

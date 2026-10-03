@@ -29,6 +29,97 @@ from pipeline.summary import offline_summary
 
 log = logging.getLogger(__name__)
 
+# 静态资源版本号 —— static/ 下哪个文件改了就把对应数字 +1。
+# 页面是预渲染到磁盘的死 HTML,模板改了不会自动影响已经落盘的成品,
+# 所以启动时会用 refresh_asset_versions() 就地重写这些引用;否则老用户
+# 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
+ASSET_VERSIONS: dict[str, int] = {
+    "app.js": 43,
+    "style.css": 33,
+    "me.js": 1,
+    "auth.js": 1,
+}
+
+# /static/app.js?v=41 这种形式;模板里统一用 asset('app.js') 生成。
+# 前面允许跟引号(或没有),是为了同时认下面两种写法:
+#   href="/static/style.css?v=33"   —— 改造后的绝对路径
+#   href="static/style.css?v=25"    —— 改造前遗留页面的相对路径
+# 用 lookbehind 卡住"引号紧跟其后",免得把 /issue/static/... 的 `/issue` 前缀吃掉。
+_ASSET_RE = re.compile(
+    r"(?<=[\"'])(/?static/)(app\.js|style\.css|me\.js|auth\.js)(?:\?v=[0-9]+)?"
+)
+
+
+def asset(name: str) -> str:
+    """模板里生成带版本号的静态资源 URL —— 版本号只有 ASSET_VERSIONS 一处定义。"""
+    ver = ASSET_VERSIONS.get(name)
+    return f"/static/{name}" + (f"?v={ver}" if ver is not None else "")
+
+
+def _sync_static_copies(out_dir: Path) -> int:
+    """把每期的 static/ 副本刷成当前 static/ 的内容。
+
+    副本是渲染那一刻拷的(render_issue_to_dir),老期不会重渲染,副本只会越来越旧;
+    相对路径引用资源的遗留页面、file:// 本地预览和导 PDF 都吃这份副本。
+    """
+    if not STATIC_DIR.is_dir():
+        return 0
+    synced = 0
+    for issue_dir in out_dir.iterdir():
+        if not (issue_dir.is_dir() and re.match(r"\d{4}-W\d{2}$", issue_dir.name)):
+            continue
+        dest = issue_dir / "static"
+        if not dest.is_dir():
+            continue
+        for src in sorted(STATIC_DIR.iterdir()):
+            if not src.is_file():
+                continue
+            try:
+                tgt = dest / src.name
+                if tgt.exists():
+                    a, b = src.stat(), tgt.stat()
+                    if a.st_size == b.st_size and int(a.st_mtime) == int(b.st_mtime):
+                        continue
+                shutil.copy2(src, tgt)
+                synced += 1
+            except Exception as e:
+                log.warning("Static copy sync failed for %s: %s", src, e)
+    return synced
+
+
+def refresh_asset_versions(out_dir: Path) -> int:
+    """就地重写已渲染 HTML 里的静态资源版本号(幂等,不重渲染、不联网)。
+
+    模板只影响"之后渲染出来的"期;磁盘上现成的成品页引用的是渲染那一刻的
+    版本号,改 static/ 之后必须在这里补一刀。
+    """
+    if not out_dir.exists():
+        return 0
+    changed = 0
+    for page in out_dir.rglob("*.html"):
+        try:
+            txt = page.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        new = _ASSET_RE.sub(
+            lambda m: f"{m.group(1)}{m.group(2)}" + (
+                f"?v={ASSET_VERSIONS[m.group(2)]}"
+                if m.group(2) in ASSET_VERSIONS else ""),
+            txt,
+        )
+        if new == txt:
+            continue
+        try:
+            page.write_text(new, encoding="utf-8")
+            changed += 1
+        except Exception as e:
+            log.warning("Asset version rewrite failed for %s: %s", page, e)
+    synced = _sync_static_copies(out_dir)
+    if changed or synced:
+        log.info("Refreshed asset versions: %d page(s), %d static copy file(s)",
+                 changed, synced)
+    return changed
+
 LEVEL_LABEL = {"B1": "入门", "B2": "进阶", "C1": "高阶"}
 
 DEFAULT_RSS_SOURCES = [
@@ -313,6 +404,7 @@ _env = jinja2.Environment(
     autoescape=jinja2.select_autoescape(["html"]),
     trim_blocks=True, lstrip_blocks=True,
 )
+_env.globals["asset"] = asset
 
 
 def article_meta(a: dict) -> dict:
@@ -420,6 +512,31 @@ def render_issue_to_dir(articles: list[dict],
     return out_dir
 
 
+def _issue_title(issue_dir: Path) -> str:
+    """取一期的标题。优先读 meta.json —— index.html 一期就 180~220KB,
+    只为抠一个 <h1> 就整篇读进来跑正则,是每次列期数(首页/健康检查/提问/
+    "最新一期"跳转)都要付一遍的代价。没有 meta.json 的历史期才回退解析 HTML。
+    """
+    meta_path = issue_dir / "meta.json"
+    if meta_path.exists():
+        try:
+            title = (json.loads(meta_path.read_text(encoding="utf-8"))
+                     .get("title") or "").strip()
+            if title:
+                return title
+        except Exception as e:
+            log.warning("Bad meta.json for %s: %s", issue_dir.name, e)
+    idx = issue_dir / "index.html"
+    if not idx.exists():
+        return ""
+    try:
+        m = re.search(r'<h1 class="cover-title">([^<]+)</h1>',
+                      idx.read_text(encoding="utf-8"))
+        return m.group(1).strip() if m else ""
+    except Exception:
+        return ""
+
+
 def scan_issues(out_dir: Path) -> list[dict]:
     issues: list[dict] = []
     if not out_dir.exists():
@@ -430,14 +547,7 @@ def scan_issues(out_dir: Path) -> list[dict]:
         idx = p / "index.html"
         if not idx.exists():
             continue
-        title = ""
-        try:
-            txt = idx.read_text(encoding="utf-8")
-            m = re.search(r'<h1 class="cover-title">([^<]+)</h1>', txt)
-            if m:
-                title = m.group(1).strip()
-        except Exception:
-            pass
+        title = _issue_title(p)
         articles_count = len(list(p.glob("article-*.html")))
         iso = p.name.split("-W")
         number = int(iso[1]) if len(iso) == 2 else 0
