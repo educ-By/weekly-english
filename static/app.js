@@ -212,6 +212,55 @@
     // 用户首次点击页面时后台预热翻译模型(下载语言包),之后悬停秒回
     document.addEventListener("click", () => { btGetTranslator(); }, { once: true });
 
+    // ---- 翻译引擎状态提示(右下角轻量浮动条) ----
+    function showXlatStatus() {
+      const box = document.createElement("div");
+      box.className = "xlat-status";
+      box.hidden = true;
+      document.body.appendChild(box);
+      let timer = null;
+      const show = (text, opts) => {
+        box.textContent = text;
+        box.hidden = false;
+        box.classList.toggle("is-err", !!(opts && opts.err));
+        box.classList.toggle("is-ok", !!(opts && opts.ok));
+        if (opts && opts.autoHide) {
+          clearTimeout(timer);
+          timer = setTimeout(() => { box.hidden = true; }, opts.autoHide);
+        }
+      };
+      if (typeof Translator === "undefined") {
+        show("当前浏览器不支持内置翻译 · 建议用 Chrome / Edge 打开", { err: true });
+        return;
+      }
+      show("翻译引擎检查中…");
+      let a;
+      try {
+        a = Translator.availability({ sourceLanguage: "en", targetLanguage: "zh" });
+      } catch (_) {
+        show("点击页面任意处以启用内置翻译", { err: true });
+        return;
+      }
+      Promise.resolve(a).then(avail => {
+        if (avail === "unavailable") {
+          show("内置翻译语言包不可用", { err: true });
+          return;
+        }
+        if (avail === "available") {
+          show("翻译引擎就绪 · 悬停生词即查", { ok: true, autoHide: 2200 });
+          return;
+        }
+        show("正在下载翻译引擎（首次使用，约 10–30 秒）…");
+        const kick = () => btGetTranslator().then(t => {
+          if (t) { btStatus = "ready"; show("翻译引擎就绪 · 悬停生词即查", { ok: true, autoHide: 2200 }); }
+          else show("翻译引擎下载失败 · 请检查网络后刷新", { err: true });
+        }).catch(() => show("点击页面任意处以启用内置翻译", { err: true }));
+        kick();
+        document.addEventListener("click", kick, { once: true });
+      }).catch(() => show("点击页面任意处以启用内置翻译", { err: true }));
+    }
+    showXlatStatus();
+
     const OFFLINE_MSG = "AI service is not available offline.";
 
     async function lookup(word, ctx) {

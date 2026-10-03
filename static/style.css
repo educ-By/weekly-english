@@ -754,3 +754,22 @@ a:hover { color: var(--accent); }
 /* ---- 弹窗头行:单词/音标靠左,✕ 靠最右 ---- */
 .vocab-popup .vp-word { justify-content: flex-start; align-items: baseline; gap: 8px; }
 .vocab-popup .vp-word .vp-close { margin-left: auto; }
+
+/* ---- 翻译引擎状态条(右下角,轻量不打扰) ---- */
+.xlat-status {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  max-width: 260px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted, #6b6f78);
+  background: var(--paper, #fafaf7);
+  border: 1px solid var(--line, #e6e2d6);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px -12px rgba(0,0,0,.25);
+}
+.xlat-status.is-ok { color: var(--b1, #4f7a59); }
+.xlat-status.is-err { color: var(--c1, #7a3b3b); }
