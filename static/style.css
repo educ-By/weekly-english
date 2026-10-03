@@ -525,6 +525,24 @@ a:hover { color: var(--accent); }
   background: var(--c-rare); color: #fff; border-color: var(--c-rare);
   cursor: default;
 }
+/* 划词工具条:Translate + 加入生词本 */
+.vocab-popup .vp-sel-actions {
+  display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+}
+.vocab-popup .vp-trans-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+.vocab-popup .vp-trans-btn:hover {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.vocab-popup .vp-trans-btn:disabled { opacity: .6; cursor: default; }
 
 /* auth page */
 .auth-card {

@@ -2,7 +2,7 @@
 
 每周自动收集 *The Economist / Guardian / BBC Learning English / NPR / Scientific American /
 Smithsonian / Aeon / China Daily / Reader's Digest* 等适合高中生的英文阅读材料,按
-CEFR B1 / B2 / C1 自动分级,**超纲词高亮**(基于真实高考词表+四六级词表)+ **DeepSeek
+CEFR B1 / B2 / C1 自动分级,**超纲词高亮**(基于高考 3500 词表 + 完整变形)+ **DeepSeek
 释义** + **AI 提问**。
 
 提供三种部署形态:
@@ -35,7 +35,7 @@ weekly-english/
 ├── static/                      样式 + 前端
 │
 ├── data/
-│   ├── cefr_vocab/              白名单(高考 + 四六级)
+│   ├── cefr_vocab/              白名单(高考 3500 + 变形;难度分级另用四六级)
 │   └── output/                  生成的周报 HTML
 │
 ├── server/
@@ -231,14 +231,17 @@ BBC Learning English*
 
 白名单来源(完全公开,非模型生成):
 
-- 高中: <https://github.com/mahavivo/english-wordlists/blob/master/Highschool_edited.txt>
-- 四六级: <https://github.com/mahavivo/english-wordlists/blob/master/CET_4+6_edited.txt>
+- 高考 3500: <https://github.com/mahavivo/english-wordlists/blob/master/Highschool_edited.txt>
+- 基础词补丁: `data/cefr_vocab/basic_whitelist.txt` —— 高考表本身缺的超基础词(数词 two–ninety、thousand/million/billion、序数 third–hundredth、星期名、`night`/`solution`/`phone` 等),逐词核对后补录
 
 判定规则:
-1. 加载白名单后自动展开所有常见屈折/派生形(覆盖 `markets`/`became`/`held` 等)
-2. 加入 200+ 不规则变化表兜底
+1. 白名单 = 高考 3500 词表;**其完整变形**(复数/三单/过去式/过去分词/-ing/比较级/最高级/副词 -ly、缩写与所有格)由 `_lemmas()` 规则 + 不规则表在查词时归一覆盖
+2. 不规则变化表兜底(不规则动词/不规则复数/不规则比较级)
 3. 专有名词(首字母大写 / 全大写缩写 / 常见地名)排除
-4. 不在白名单 → 标深紫色 + 下划线 + hover 时弹 DeepSeek 释义
+4. 不在白名单 → 标深紫色 + 下划线 + hover 时弹 DeepSeek 释义;也可**划词**选中任意单词/短语查翻译并加入生词本
+5. 每篇最多标 30 个超纲词(按词频)
+
+> 注:文章难度分级(pipeline/difficulty.py)仍按"高考 + 四六级"口径,与超纲词白名单相互独立。
 
 ---
 
@@ -269,7 +272,7 @@ BBC Learning English*
 
 - ✅ 多 RSS 源聚合
 - ✅ CEFR B1/B2/C1 自动分级
-- ✅ 真实词表驱动的超纲词高亮(白名单 + 词形闭包)
+- ✅ 高考 3500 词表驱动的超纲词高亮(白名单 + 完整变形 + 划词查词/加生词本)
 - ✅ 多页刊物式信息架构:首页门户 / 本期目录 / 精读页 / 往期(按年分组)/ 难度专区 / 全站搜索 / 我的学习,共享常驻导航与面包屑
 - ✅ Web Speech 朗读 + 自定义音频上传
 - ✅ DeepSeek 词典查询(端点式释义)

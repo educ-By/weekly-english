@@ -214,8 +214,9 @@
     const cache = new Map();   // word → lookup promise
     let active = null;
 
-    function showAt(el, text) {
-      const r = el.getBoundingClientRect();
+    function showAt(target, text) {
+      const r = (target && typeof target.getBoundingClientRect === "function")
+        ? target.getBoundingClientRect() : target;
       popup.innerHTML = text;
       popup.hidden = false;
       const pw = popup.offsetWidth;
@@ -241,19 +242,22 @@
     }
 
     // 把当前文章上下文写到 popup 上,供"加入生词本"按钮使用
-    function setVocabContext(word, definition, translation) {
+    function setVocabContext(word, definition, translation, sentence) {
       const articleId = (document.querySelector("article.entry") || {}).id
                           ?.replace(/^article-/, "") || "";
       const issueKeyMatch = location.pathname.match(/(\d{4}-W\d{2})/);
       const issueKey = issueKeyMatch ? issueKeyMatch[1]
                                       : (document.body.dataset.issueKey || "");
-      const sentenceEl = document.querySelector(".entry-body p");
+      const firstP = document.querySelector(".entry-body p");
       popup.dataset.articleId = articleId;
       popup.dataset.issueKey = issueKey;
       popup.dataset.word = word;
       popup.dataset.definition = definition || "";
       popup.dataset.translation = translation || "";
-      popup.dataset.sentence = sentenceEl ? sentenceEl.textContent.trim().slice(0, 240) : "";
+      // 优先用调用方给的句子/当前词的所属句 —— 不再无脑取第一段
+      const sent = sentence != null ? sentence
+        : (active && active.ctx) || (firstP ? firstP.textContent.trim().slice(0, 240) : "");
+      popup.dataset.sentence = sent || "";
     }
 
     // 弹窗正文统一走这里:写回 dataset(供"加入生词本"用)+ 渲染
@@ -298,7 +302,7 @@
         const info = await r.json();
         const zh = (info && (info.translation || info.definition_en)) || "";
         if (!zh) throw new Error("empty");
-        drawCard(active.el, {
+        drawCard(active.anchor || active.el, {
           word,
           phonetic: info.phonetic || "",
           definition_en: info.definition_en || "",
@@ -547,10 +551,10 @@
       const word = (el.dataset.word || el.textContent || "").trim().toLowerCase();
       if (!word) return;
       const ctx = sentenceContext(el);
-      active = { el, word, ctx };
+      active = { el, anchor: el, word, ctx };
       // 立即显示加载态 — 体感秒开,释义返回后原地填充
       if (popup.hidden || popup.dataset.word !== word) {
-        setVocabContext(word, "", "");
+        setVocabContext(word, "", "", ctx);
         showAt(el,
           `<div class="vp-word">${escapeHtml(word)}` +
           `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
@@ -588,6 +592,9 @@
 
     article.addEventListener("mouseover", onEnter);
     article.addEventListener("click", e => {
+      // 划词(非折叠选区)时不抢 .rare 的点击,避免和选区工具条打架
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) return;
       const el = e.target.closest(".rare, .vocab-word");
       if (el && article.contains(el)) onEnter({ target: el });
     });
@@ -595,16 +602,80 @@
     popup.addEventListener("click", e => {
       if (e.target.closest("[data-close-popup]")) { hide(); return; }
       const btn = e.target.closest("[data-online-lookup]");
-      if (btn) onlineLookup(btn);
+      if (btn) { onlineLookup(btn); return; }
+      const sbtn = e.target.closest("[data-selection-lookup]");
+      if (sbtn) selectionLookup(sbtn);
     });
     document.addEventListener("click", e => {
       if (popup.hidden) return;
       if (popup.contains(e.target) || e.target.closest(".rare, .vocab-word")) return;
+      // 划词后紧接的 click 不要关掉刚弹出的工具条
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) return;
       hide();
     });
     document.addEventListener("keydown", e => {
       if (e.key === "Escape" && !popup.hidden) hide();
     });
+
+    // ---- 划词:选中正文里任意单词/短语 → 翻译 / 加入生词本 ----
+    // 与悬停查词共用同一个弹窗与 dataset 契约(加入生词本的按钮直接复用)。
+    let selTimer = null;
+    function onSelectionEnd() {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+        const raw = sel.toString().replace(/\s+/g, " ").trim();
+        if (!raw || raw.length > 80) return;              // 过长(整段)忽略
+        if (!/^[A-Za-z][A-Za-z'’.\-\s]*$/.test(raw)) return; // 只认英文词/短语
+        const range = sel.getRangeAt(0);
+        const node = range.commonAncestorContainer;
+        const body = article.querySelector(".entry-body");
+        if (!body || !body.contains(node) || popup.contains(node)) return;
+        const el = node.nodeType === 1 ? node : node.parentElement;
+        const p = (el && (el.closest("p") || el.closest(".entry-body"))) || body;
+        const rect = range.getBoundingClientRect();
+        const word = raw.toLowerCase();
+        active = { el: null, anchor: rect, word, ctx: p.textContent.trim().slice(0, 240) };
+        setVocabContext(word, "", "", active.ctx);
+        showAt(rect,
+          `<div class="vp-word">${escapeHtml(raw)}` +
+          `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
+          `<div class="vp-sel-actions">` +
+          `<button class="vp-trans-btn" data-selection-lookup>Translate</button>` +
+          `<button class="vp-add" data-add-vocab>＋ Add to my words</button></div>`);
+      }, 0);
+    }
+    async function selectionLookup(btn) {
+      if (!active) return;
+      const word = active.word;
+      btn.disabled = true;
+      btn.textContent = "翻译中…";
+      const res = await browserTranslate(word);
+      if (!active || active.word !== word) return;
+      if (res && res.zh) {
+        drawCard(active.anchor, { word, phonetic: "", definition_en: "",
+                                  translation: res.zh + "（浏览器翻译）", cefr_level: "" }, "", true);
+        return;
+      }
+      // 内置引擎不可用时退到在线词典(用户主动点击才烧 AI 额度)
+      try {
+        const q = active.ctx ? `&sentence=${encodeURIComponent(active.ctx)}` : "";
+        const r = await fetch(`/api/dict?word=${encodeURIComponent(word)}${q}`);
+        const info = await r.json();
+        if (!info || !(info.translation || info.definition_en)) throw new Error("empty");
+        drawCard(active.anchor, { word, phonetic: info.phonetic || "",
+                                  definition_en: info.definition_en || "",
+                                  translation: info.translation || "",
+                                  cefr_level: info.cefr_level || "" }, "", true);
+      } catch (_) {
+        btn.disabled = false;
+        btn.textContent = "翻译失败，重试";
+      }
+    }
+    article.addEventListener("mouseup", onSelectionEnd);
+    document.addEventListener("touchend", onSelectionEnd, { passive: true });
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => ({

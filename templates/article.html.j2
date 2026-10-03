@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>{{ article.title }} · Weekly English</title>
-<link rel="stylesheet" href="/static/style.css?v=29" />
+<link rel="stylesheet" href="/static/style.css?v=30" />
 </head>
 <body data-page="article" data-issue-key="{{ issue.key }}">
 
@@ -84,8 +84,8 @@
     <details class="rare-words">
       <summary>Out-of-scope vocabulary · {{ article.rare_words|length }} words</summary>
       <p class="rare-help">
-        Words below are not in the standard high-school / CET-4+6 curriculum.
-        Hover any highlighted word in the article for a quick gloss.
+        Words below are not in the 3,500-word gaokao list (or its common inflections).
+        Hover a highlighted word for a quick gloss — or <strong>select any word or phrase</strong> in the text to translate it and save it to your words.
       </p>
       <div class="vocab-list">
         {% for w in article.rare_words %}
@@ -136,6 +136,6 @@
 
 {% include "_footer.html.j2" %}
 
-<script src="/static/app.js?v=36"></script>
+<script src="/static/app.js?v=37"></script>
 </body>
 </html>

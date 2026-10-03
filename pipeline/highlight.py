@@ -1,15 +1,14 @@
 """
 超纲词高亮 — 唯一原则:
 
-    凡是不在"高中课标 ∩ 四六级"白名单里的英文词 = 超纲词。
+    凡是不在"高考 3500 词表 + 其常见变形(屈折/派生/缩写)"内的英文词 = 超纲词。
     标红色圆点下划线。专有名词、首字母大写、缩写、数字一律不标。
 
 白名单来源(完全公开,非模型生成):
-  - 高中: https://github.com/mahavivo/english-wordlists/blob/master/Highschool_edited.txt
-  - 四六级: https://github.com/mahavivo/english-wordlists/blob/master/CET_4+6_edited.txt
+  - 高考 3500: https://github.com/mahavivo/english-wordlists/blob/master/Highschool_edited.txt
+  - 变形由 `_lemmas()`(规则)* `_IRREGULAR`(不规则表) 在查词时归一覆盖。
 
-若用户接入有道词典 API,可在此基础上叠加"权威词典是否收录"二次校验,
-接口骨架见 youdao_client.py。
+注:难度分级(pipeline/difficulty.py)另按"高考 + 四六级"口径判级,与此处白名单相互独立。
 """
 from __future__ import annotations
 import re
@@ -201,7 +200,22 @@ _IRREGULAR.update({
     "clung": "cling", "flung": "fling", "stung": "sting",
     "sprang": "spring", "sprung": "spring", "spun": "spin",
     "sank": "sink", "sunk": "sink", "shrank": "shrink", "shrunk": "shrink",
+    # 补全:与高考词表逐词核对后的漏项
+    "men": "man", "oxen": "ox", "appendices": "appendix",
+    "less": "little", "farther": "far", "most": "many",
+    "arose": "arise", "arisen": "arise", "awoke": "awake", "awoken": "awake",
+    "beaten": "beat", "bitten": "bite", "dove": "dive", "dreamt": "dream",
+    "forbade": "forbid", "forbidden": "forbid",
+    "forgave": "forgive", "forgiven": "forgive",
+    "learnt": "learn", "mistook": "mistake", "overcame": "overcome",
+    "sewn": "sew", "slid": "slide", "smelt": "smell", "spelt": "spell",
+    "spat": "spit", "swept": "sweep", "swung": "swing", "wept": "weep",
+    # 缩写边缘形
+    "y'all": "you", "ma'am": "madam",
 })
+
+# 常见缩写(非动词缩写形)——列出以免被当生词
+_COMMON_ABBREV = {"approx", "asap", "dept", "govt", "etc", "vs", "eg", "ie", "aka"}
 
 # 缩写还原表 — 不规则缩写(不能靠简单去后缀得到原型)
 _CONTRACTION_BASE = {
@@ -218,7 +232,7 @@ def _lemmas(t: str) -> list[str]:
     out: list[str] = []
 
     def add(x: str) -> None:
-        if x and len(x) >= 2 and x not in out:
+        if x and len(x) >= 1 and x not in out:
             out.append(x)
 
     def add_irregular(x: str) -> None:
@@ -277,11 +291,34 @@ def _lemmas(t: str) -> list[str]:
         add_irregular(s[:-1])
         if s[-3] == s[-4] and s[-3] not in "aeiou":
             add_irregular(s[:-3])
-    # 副词 -ly(fully←full、truly←true、really←real)
-    if s.endswith("ly") and len(s) > 4:
+    # 副词 -ly(fully←full、truly←true、really←real、duly←due)
+    if s.endswith("ly") and len(s) > 3:
         add_irregular(s[:-2])
         add_irregular(s[:-1])
         add_irregular(s[:-2] + "e")
+        if s[:-1].endswith("l"):
+            add_irregular(s[:-1] + "e")
+    # 名词复数 -ves → -f / -fe(knives/wolves/shelves/loaves/thieves/halves)
+    if s.endswith("ves") and len(s) > 4:
+        add_irregular(s[:-3] + "f")
+        add_irregular(s[:-3] + "fe")
+    # -oes → -o(tomatoes/potatoes/heroes/volcanoes/echoes)
+    if s.endswith("oes") and len(s) > 4:
+        add_irregular(s[:-2])
+    # 副词派生:basically→basic、possibly→possible、simply→simple
+    if s.endswith("ally") and len(s) > 5:
+        add_irregular(s[:-4])          # basically → basic / specifically → specific
+        add_irregular(s[:-2])          # → basical
+    if s.endswith("bly") and len(s) > 5:
+        add_irregular(s[:-3] + "ble")
+    if s.endswith("ly") and len(s) > 3 and s[:-1].endswith("l"):
+        add_irregular(s[:-1] + "e")
+    # -ying → -ie(dying→die、tying→tie)
+    if s.endswith("ying") and len(s) > 4:
+        add_irregular(s[:-4] + "ie")
+    # -cked → -c(panicked→panic)
+    if s.endswith("cked"):
+        add_irregular(s[:-4])
     return out
 
 
@@ -375,7 +412,7 @@ def _load_whitelist(names: tuple = ("highschool_whitelist.txt", "cet_whitelist.t
     return expanded
 
 
-WHITELIST: set[str] = _load_whitelist()
+WHITELIST: set[str] = _load_whitelist(("highschool_whitelist.txt", "basic_whitelist.txt"))
 
 
 def find_out_of_scope_words(text: str,
@@ -395,6 +432,8 @@ def find_out_of_scope_words(text: str,
         if _is_acronym(t):
             continue
         if t in _COMMON_PROPER_HINTS:
+            continue
+        if t in _COMMON_ABBREV:
             continue
         # 原型在白名单 → 不标
         if t in vocab:
