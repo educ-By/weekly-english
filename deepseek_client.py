@@ -198,22 +198,32 @@ def lookup_word(word: str,
         lvl = _env("LLM_THINKING_LEVEL")
         if lvl:
             extra["extra_body"] = {"thinking": {"level": lvl}}
-        resp = client.chat.completions.create(
-            model=model or cfg["model"],
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=400, temperature=0.1,
-            **extra,
-        )
-        text = (resp.choices[0].message.content or "").strip()
-        # 健壮解析:剥掉 markdown 围栏,截取第一个 {...}
         import json as _json, re as _re
-        m = _re.search(r"\{.*\}", text, _re.S)
-        data = {}
-        if m:
-            try:
-                data = _json.loads(m.group(0))
-            except Exception:
-                data = {}
+        data, text = {}, ""
+        for attempt in range(2):
+            resp = client.chat.completions.create(
+                model=model or cfg["model"],
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=800, temperature=0.1,   # 思考型模型需要充足预算
+                **extra,
+            )
+            msg = resp.choices[0].message
+            text = (msg.content or "").strip()
+            if not text:
+                # 思考型模型把内容写进了 reasoning_content — 从中提取 JSON
+                rc = getattr(msg, "reasoning_content", None) or ""
+                m2 = _re.search(r"\{[^{}]*\}", rc, _re.S)
+                text = m2.group(0) if m2 else rc.strip()
+            # 健壮解析:剥掉 markdown 围栏,截取第一个 {...}
+            m = _re.search(r"\{[^{}]*\}", text, _re.S)
+            if m:
+                try:
+                    data = _json.loads(m.group(0))
+                except Exception:
+                    data = {}
+            if isinstance(data, dict) and (data.get("zh") or data.get("translation")):
+                break   # 拿到中文释义,结束
+            data = {}
         usage = getattr(resp, "usage", None)
         info = {"ok": True, "word": word,
                 "phonetic": (data.get("phonetic") or "") if isinstance(data, dict) else "",
