@@ -459,7 +459,9 @@ def scan_issues(out_dir: Path) -> list[dict]:
 # 卡片从 <a class="card card-b2"> 开始,到下一张卡片为止;字段逐个单独提取,
 # 因为改造前的模板没有开转义,属性值里可能夹着 <i> 这类标签或裸引号。
 _CARD_OPEN_RE = re.compile(r'<a class="card card-(?P<level>[a-z0-9]+)"', re.S)
-_ID_RE = re.compile(r'href="article-([A-Za-z0-9_-]+)\.html"')
+# href 可能是相对的(article-x.html,改造前)也可能是根绝对路径
+# (/issue/2026-W40/article-x.html,改造后)——两种都要认,否则 meta.json 一丢就漏整期
+_ID_RE = re.compile(r'href="[^"]*article-([A-Za-z0-9_-]+)\.html"')
 
 
 def _first_group(pattern: str, text: str) -> str:

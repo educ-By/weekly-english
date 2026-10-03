@@ -100,7 +100,7 @@
   {% for lvl, label in [("B1", "入门"), ("B2", "进阶"), ("C1", "高阶")] %}
   {% set group_cards = articles | selectattr("level", "equalto", lvl) | list %}
   {% if group_cards %}
-  <section class="cards level-block lv-{{ lvl|lower }} is-closed" data-block="{{ lvl }}">
+  <section class="cards level-block lv-{{ lvl|lower }}" data-block="{{ lvl }}">
     <button class="block-head" type="button" data-toggle-block="{{ lvl }}">
       <span class="chip chip-{{ lvl|lower }}">{{ lvl }}</span>
       <span class="block-title">{{ label }}层 · {{ group_cards|length }} 篇</span>
