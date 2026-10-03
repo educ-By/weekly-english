@@ -169,6 +169,41 @@
       return p ? p.textContent.trim().slice(0, 240) : "";
     }
 
+    // ---- 浏览器自带翻译(Chrome/Edge 内置 Translation API,零 token) ----
+    const btCache = new Map();
+    let btReady = null;   // 共享的 translator 实例(首次创建会下载语言包)
+
+    function btGetTranslator() {
+      if (!btReady) {
+        btReady = (async () => {
+          if (typeof Translator === "undefined") return null;
+          const avail = await Translator.availability({ sourceLanguage: "en", targetLanguage: "zh" });
+          if (avail === "unavailable") return null;
+          return await Translator.create({ sourceLanguage: "en", targetLanguage: "zh" });
+        })().catch(() => null);
+      }
+      return btReady;
+    }
+
+    async function browserTranslate(word) {
+      if (btCache.has(word)) return btCache.get(word);
+      const p = (async () => {
+        try {
+          const t = await btGetTranslator();
+          if (!t) return null;
+          const out = (await t.translate(word)) || "";
+          return out.trim() || null;
+        } catch (_) {
+          return null;   // 老浏览器/下载失败 → 回退后端词典
+        }
+      })();
+      btCache.set(word, p);
+      return p;
+    }
+
+    // 用户首次点击页面时后台预热翻译模型(下载语言包),之后悬停秒回
+    document.addEventListener("click", () => { btGetTranslator(); }, { once: true });
+
     const OFFLINE_MSG = "AI service is not available offline.";
 
     async function lookup(word, ctx) {
@@ -216,7 +251,17 @@
           `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
           `<div class="vp-trans vp-loading">查询中…</div>`);
       }
-      lookup(word, ctx).then(info => {
+      // 浏览器翻译最多等 1.5 秒(语言包未就绪时不阻塞),超时用后端词典兜底
+      const viaBrowser = Promise.race([
+        browserTranslate(word),
+        new Promise(res => setTimeout(() => res(null), 1500)),
+      ]).then(zh =>
+        zh ? { ok: true, word, phonetic: "", definition_en: "",
+               translation: zh + "（浏览器翻译）", examples: [], cefr_level: "" } : null);
+      Promise.resolve(viaBrowser).then(info => {
+        if (info) return info;
+        return lookup(word, ctx);
+      }).then(info => {
         if (!active || active.word !== word) return;
         // 弹窗已展示同一词的完整内容时不要重建 DOM —
         // 否则迟到的响应会在用户点击按钮的瞬间替换按钮,点击落空
