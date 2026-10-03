@@ -64,8 +64,24 @@ class CachedStatic(StaticFiles):
 app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
 
 
+def _ensure_data_seed():
+    """挂载持久化卷后 /app/data 为空 — 从镜像内的种子恢复词表文件。"""
+    import shutil
+    dst = Path(__file__).resolve().parent.parent / "data" / "cefr_vocab"
+    if dst.exists() and any(dst.glob("*.txt")):
+        return
+    for seed in (Path("/opt/cefr_seed/cefr_vocab"),):
+        if seed.exists():
+            dst.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(seed, dst, dirs_exist_ok=True)
+            log.info("cefr_vocab restored from seed: %s", dst)
+            return
+    log.warning("cefr_vocab missing and no seed found at %s", dst)
+
+
 @app.on_event("startup")
 def _init_db():
+    _ensure_data_seed()
     try:
         db.init_db()
         log.info("DB initialized: %s", db.get_database_url().split("://")[0])
