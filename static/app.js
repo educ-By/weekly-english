@@ -249,6 +249,61 @@
       popup.dataset.sentence = sentenceEl ? sentenceEl.textContent.trim().slice(0, 240) : "";
     }
 
+    // 弹窗正文统一走这里:写回 dataset(供"加入生词本"用)+ 渲染
+    // extra 追加在按钮之后(引擎不可用时的"在线词典"退路);force 用于用户主动查询后覆盖旧内容
+    function drawCard(el, info, extra, force) {
+      const def = info.definition_en || "";
+      const tr  = info.translation || "";
+      // 弹窗已展示同一词的完整内容时不要重建 DOM —
+      // 否则迟到的响应会在用户点击按钮的瞬间替换按钮,点击落空。
+      // 例外:当前显示的是"引擎不可用"(带在线词典按钮)时允许覆盖,否则引擎恢复后还停在错误文案上。
+      if (!force && !popup.hidden && popup.dataset.word === info.word
+          && popup.querySelector(".vp-add") && !popup.querySelector("[data-online-lookup]")
+          && popup.textContent.indexOf("Add to") !== -1) {
+        setVocabContext(info.word, def, tr);
+        return;
+      }
+      setVocabContext(info.word, def, tr);
+      const html =
+        `<div class="vp-word">${escapeHtml(info.word)}` +
+        (info.phonetic ? `<span class="vp-phon">${escapeHtml(info.phonetic)}</span>` : "") +
+        (info.cefr_level ? `<span class="vp-level">${escapeHtml(info.cefr_level)}</span>` : "") +
+        `<button class="vp-close" data-close-popup title="Close">✕</button>` +
+        `</div>` +
+        (def ? `<div class="vp-trans">${escapeHtml(def)}</div>` : "") +
+        (tr && tr !== def ? `<div class="vp-trans">${escapeHtml(tr)}</div>` : "") +
+        `<button class="vp-add" data-add-vocab>＋ Add to my words</button>` +
+        (extra || "");
+      showAt(el, html);
+    }
+
+    // 内置引擎用不了时的退路:/api/dict(服务端共享词典,命中过就直接复用,不重复烧 token)
+    async function onlineLookup(btn) {
+      const word = popup.dataset.word;
+      if (!active || active.word !== word) return;
+      const ctx = active.ctx || popup.dataset.sentence || "";
+      btn.disabled = true;
+      btn.textContent = "查询中…";
+      try {
+        const url = `/api/dict?word=${encodeURIComponent(word)}` +
+                    (ctx ? `&sentence=${encodeURIComponent(ctx)}` : "");
+        const r = await fetch(url);
+        const info = await r.json();
+        const zh = (info && (info.translation || info.definition_en)) || "";
+        if (!zh) throw new Error("empty");
+        drawCard(active.el, {
+          word,
+          phonetic: info.phonetic || "",
+          definition_en: info.definition_en || "",
+          translation: info.translation || "",
+          cefr_level: info.cefr_level || "",
+        }, "", true);
+      } catch (_) {
+        btn.disabled = false;
+        btn.textContent = "查询失败，稍后再试";
+      }
+    }
+
     // ---- 确定性关闭模型:弹窗一旦显示,只有三种方式关闭 ----
     //   1. 点弹窗外的任意区域  2. 按 Esc  3. 点弹窗上的 ✕
     // 没有任何计时器/鼠标移出逻辑 — 迟到的词典响应、缓慢的鼠标移动都不影响它。
@@ -264,100 +319,180 @@
     }
 
     // ---- 浏览器自带翻译(Chrome/Edge 内置 Translation API,零 token) ----
-    const btCache = new Map();
-    let btReady = null;   // 共享的 translator 实例(首次创建会下载语言包)
+    // 两个坑必须守住,bug 全出在这两处:
+    //   ① 语言包尚未下载时,Translator.create() 要求用户手势,否则抛 NotAllowedError。
+    //      所以页面加载时自动预热是注定失败的 —— 只能等用户点过页面再去建。
+    //   ② 失败绝不可缓存。旧版把这次注定失败的预热钉成 null,于是浏览器明明支持 API,
+    //      用户之后怎么点都不再重试,一律收到"此浏览器不支持内置翻译"这句错话。
+    const btCache = new Map();   // word → Promise<{zh} | {err}>
+    let btTranslator = null;     // 建好的 translator 实例
+    let btPending = null;        // 进行中的创建(单飞;一结束就清空,留出重试)
+    let btPhase = "idle";        // idle | no-api | unavailable | no-response | need-gesture | downloading | ready | failed
+    let btVerdict = "";          // 会话级结论(no-api/unavailable/no-response):悬停时直接复用,不必每次等探测器超时
+    let btPct = 0;
+    let btNote = "";             // 最近一次失败原因原文(排障用)
 
-    function btGetTranslator() {
-      if (!btReady) {
-        btReady = (async () => {
-          if (typeof Translator === "undefined") return null;
-          const avail = await Translator.availability({ sourceLanguage: "en", targetLanguage: "zh" });
-          if (avail === "unavailable") return null;
-          return await Translator.create({ sourceLanguage: "en", targetLanguage: "zh" });
-        })().catch(() => null);
-      }
-      return btReady;
+    const BT_PAIR = { sourceLanguage: "en", targetLanguage: "zh" };
+    const btHasAPI = () => typeof Translator !== "undefined";
+    // 用户手势:Chromium 里"点过页面"长期有效(navigator.userActivation 老浏览器上不存在)
+    const btHasGesture = () => {
+      const ua = navigator.userActivation;
+      return !!(ua && (ua.isActive || ua.hasBeenActive));
+    };
+
+    // availability() 在个别实现上会一直不返回 —— 不能把弹窗就这么挂在"翻译中…"上
+    function btAvailability() {
+      return Promise.race([
+        Promise.resolve(Translator.availability(BT_PAIR)),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("availability-timeout")), 8000)),
+      ]);
     }
 
-    let btStatus = "idle";   // idle | downloading | ready
+    function btCreate() {
+      const attempt = (withMonitor) => {
+        const opts = { ...BT_PAIR };
+        if (withMonitor) {
+          opts.monitor = m => {
+            try {
+              m.addEventListener("downloadprogress", ev => {
+                btPct = Math.round((ev.loaded || 0) * 100);
+                btRefresh();
+              });
+            } catch (_) { /* 不支持进度事件不影响翻译,只是没有百分比 */ }
+          };
+        }
+        return Translator.create(opts);
+      };
+      return new Promise((resolve, reject) => {
+        // 语言包可能要下几十秒,但卡死的 create 不能永久占着弹窗
+        const timer = setTimeout(() => reject(new Error("download-timeout")), 180000);
+        const settle = fn => v => { clearTimeout(timer); fn(v); };
+        let p;
+        try {
+          p = attempt(true).catch(e => {
+            // 个别实现不认 monitor 选项 —— 退回最朴素的调用,别让进度条拖垮翻译本身
+            if (e instanceof TypeError) return attempt(false);
+            throw e;
+          });
+        } catch (e) { clearTimeout(timer); reject(e); return; }
+        p.then(settle(resolve), settle(reject));
+      });
+    }
+
+    // force=true 只用在"用户刚点过页面"这种场合:值得把结论作废重探一次
+    function btEnsure(force) {
+      if (btTranslator) return Promise.resolve(btTranslator);
+      if (btPending) return btPending;
+      if (btVerdict && !force) { btPhase = btVerdict; return Promise.resolve(null); }
+      const run = (async () => {
+        if (!btHasAPI()) { btPhase = btVerdict = "no-api"; return null; }
+        let avail;
+        try {
+          avail = await btAvailability();
+        } catch (e) {
+          if (e && e.message === "availability-timeout") {
+            btPhase = btVerdict = "no-response";
+          } else {
+            btPhase = btVerdict = "unavailable";
+          }
+          btNote = String(e); return null;
+        }
+        if (avail === "unavailable") { btPhase = btVerdict = "unavailable"; return null; }
+        // 缺语言包又没手势:这不是"不支持",只是还差一次点击 —— 不试、也不记失败
+        if (avail !== "available" && !btHasGesture()) { btPhase = "need-gesture"; return null; }
+        if (avail !== "available") { btPhase = "downloading"; btPct = 0; btRefresh(true); }
+        try {
+          btTranslator = await btCreate();
+          btPhase = "ready"; btVerdict = ""; btPct = 100; btNote = "";
+        } catch (e) {
+          btPhase = (e && e.name === "NotAllowedError") ? "need-gesture" : "failed";
+          btNote = ((e && e.name) ? e.name + ": " : "") + ((e && e.message) || e);
+        }
+        return btTranslator;
+      })();
+      btPending = run.finally(() => { btPending = null; });
+      return btPending;
+    }
 
     async function browserTranslate(word) {
       if (btCache.has(word)) return btCache.get(word);
       const p = (async () => {
+        const t = await btEnsure();
+        if (!t) return { err: btPhase };
         try {
-          if (typeof Translator === "undefined") return { err: "unsupported" };
-          const avail = await Translator.availability({ sourceLanguage: "en", targetLanguage: "zh" });
-          if (avail === "unavailable") return { err: "unsupported" };
-          if (avail !== "available") btStatus = "downloading";
-          const t = await btGetTranslator();
-          if (!t) return { err: "unsupported" };
-          btStatus = "ready";
-          const out = (await t.translate(word)) || "";
-          return out.trim() ? { zh: out.trim() } : { err: "empty" };
+          const out = ((await t.translate(word)) || "").trim();
+          return out ? { zh: out } : { err: "empty" };
         } catch (e) {
-          // 语言包下载被阻止(需要用户手势)或下载失败
-          return { err: "blocked" };
+          // 实例失效(引擎被回收 / 语言包被清理)—— 丢掉它,下次重建
+          btTranslator = null; btPhase = "idle"; return { err: "failed" };
         }
       })();
       btCache.set(word, p);
+      p.then(res => { if (!res || !res.zh) btCache.delete(word); });   // 失败不入缓存,可重试
       return p;
     }
 
-    // 用户首次点击页面时后台预热翻译模型(下载语言包),之后悬停秒回
-    document.addEventListener("click", () => { btGetTranslator(); }, { once: true });
-
     // ---- 翻译引擎状态提示(右下角轻量浮动条) ----
-    function showXlatStatus() {
-      const box = document.createElement("div");
-      box.className = "xlat-status";
-      box.hidden = true;
-      document.body.appendChild(box);
-      let timer = null;
-      const show = (text, opts) => {
-        box.textContent = text;
-        box.hidden = false;
-        box.classList.toggle("is-err", !!(opts && opts.err));
-        box.classList.toggle("is-ok", !!(opts && opts.ok));
-        // 状态条常驻 DOM、靠 hidden 反复开关,重放一次淡入免得每次都硬蹦出来
-        box.classList.remove("is-in");
-        void box.offsetWidth;
-        box.classList.add("is-in");
-        if (opts && opts.autoHide) {
-          clearTimeout(timer);
-          timer = setTimeout(() => { box.hidden = true; }, opts.autoHide);
-        }
-      };
-      if (typeof Translator === "undefined") {
-        show("当前浏览器不支持内置翻译 · 建议用 Chrome / Edge 打开", { err: true });
-        return;
+    let toastBox = null, toastTimer = null, toastKind = "";
+
+    function toast(text, kind, autoHide) {
+      if (!toastBox) {
+        toastBox = document.createElement("div");
+        toastBox.className = "xlat-status";
+        toastBox.hidden = true;
+        document.body.appendChild(toastBox);
       }
-      show("翻译引擎检查中…");
-      let a;
-      try {
-        a = Translator.availability({ sourceLanguage: "en", targetLanguage: "zh" });
-      } catch (_) {
-        show("点击页面任意处以启用内置翻译", { err: true });
-        return;
-      }
-      Promise.resolve(a).then(avail => {
-        if (avail === "unavailable") {
-          show("内置翻译语言包不可用", { err: true });
-          return;
-        }
-        if (avail === "available") {
-          show("翻译引擎就绪 · 悬停生词即查", { ok: true, autoHide: 2200 });
-          return;
-        }
-        show("正在下载翻译引擎（首次使用，约 10–30 秒）…");
-        const kick = () => btGetTranslator().then(t => {
-          if (t) { btStatus = "ready"; show("翻译引擎就绪 · 悬停生词即查", { ok: true, autoHide: 2200 }); }
-          else show("翻译引擎下载失败 · 请检查网络后刷新", { err: true });
-        }).catch(() => show("点击页面任意处以启用内置翻译", { err: true }));
-        kick();
-        document.addEventListener("click", kick, { once: true });
-      }).catch(() => show("点击页面任意处以启用内置翻译", { err: true }));
+      toastKind = kind || "";
+      toastBox.textContent = text;
+      toastBox.hidden = false;
+      toastBox.classList.toggle("is-err", kind === "err");
+      toastBox.classList.toggle("is-ok", kind === "ok");
+      // 状态条常驻 DOM、靠 hidden 反复开关,重放一次淡入免得每次都硬蹦出来
+      toastBox.classList.remove("is-in");
+      void toastBox.offsetWidth;
+      toastBox.classList.add("is-in");
+      clearTimeout(toastTimer);
+      if (autoHide) toastTimer = setTimeout(() => { toastBox.hidden = true; }, autoHide);
     }
-    showXlatStatus();
+
+    // 下载进度推送:状态条与弹窗里的"下载中"文案同步刷新(force 用于刚转入下载态时立刻改写状态条)
+    function btRefresh(force) {
+      if (btPhase !== "downloading") return;
+      const text = "正在下载翻译语言包" + (btPct ? " " + btPct + "%" : "") + "…";
+      if (force || toastKind === "download") toast(text, "download");
+      const loading = popup.querySelector(".vp-loading");
+      if (loading) loading.textContent = text;
+    }
+
+    function btReport() {
+      switch (btPhase) {
+        case "no-api":
+          toast("这个浏览器没有内置翻译引擎 · 请用 Chrome / Edge 138+ 桌面版打开", "err"); break;
+        case "unavailable":
+          toast("浏览器没有开放内置翻译 · 可能被设置或策略关掉了", "err"); break;
+        case "no-response":
+          toast("浏览器内置翻译没有响应 · 点生词可用在线词典", "err"); break;
+        case "need-gesture":
+          toast("内置翻译语言包还没下载 · 点击页面任意处开始下载（约 10-60 秒）", "err"); break;
+        case "downloading":
+          btRefresh(true); break;
+        case "ready":
+          toast("翻译引擎就绪 · 悬停生词即查", "ok", 2200); break;
+        case "failed":
+          toast("翻译语言包下载失败 · 请检查网络后刷新重试", "err"); break;
+        default:
+          toast("翻译引擎检查中…");
+      }
+    }
+
+    // 页面加载只探测(不建实例,免得必然失败);用户点过页面后才真正去下载
+    btReport();
+    btEnsure().then(btReport);
+    document.addEventListener("click", () => { btEnsure(true).then(btReport); }, { once: true });
+
+    // 排障入口:控制台跑 __bt() 可看到引擎当前状态与失败原文
+    window.__bt = () => ({ phase: btPhase, pct: btPct, note: btNote,
+                           hasAPI: btHasAPI(), gesture: btHasGesture() });
 
     const OFFLINE_MSG = "AI service is not available offline.";
 
@@ -405,42 +540,34 @@
           `<div class="vp-word">${escapeHtml(word)}` +
           `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
           `<div class="vp-trans vp-loading">` +
-          (btStatus === "downloading" ? "正在下载翻译语言包…" : "翻译中…") +
+          (btPhase === "downloading" ? "正在下载翻译语言包…" : "翻译中…") +
           `</div>`);
       }
-      // 只用浏览器内置翻译 — 单词查词不调用任何 AI
+      // 默认只走浏览器内置翻译 — 悬停查词不调用任何 AI
       browserTranslate(word).then(res => {
-        const info = res && res.zh
-          ? { word, phonetic: "", definition_en: "",
-              translation: res.zh + "（浏览器翻译）", examples: [], cefr_level: "" }
-          : { word, phonetic: "", definition_en: "",
-              translation: {
-                unsupported: "此浏览器不支持内置翻译 — 请用 Chrome / Edge 打开（无需联网 AI）",
-                blocked: "首次使用需下载翻译语言包：请先点击页面任意处，等 10-30 秒后再悬停",
-                empty: "未获取到释义，请再悬停一次",
-              }[res && res.err] || "翻译不可用",
-              examples: [], cefr_level: "" };
         if (!active || active.word !== word) return;
-        // 弹窗已展示同一词的完整内容时不要重建 DOM —
-        // 否则迟到的响应会在用户点击按钮的瞬间替换按钮,点击落空
-        if (!popup.hidden && popup.dataset.word === word
-            && popup.querySelector(".vp-add") && popup.textContent.indexOf("Add to") !== -1) {
-          setVocabContext(word, info.definition_en || "", info.translation || "");
+        if (res && res.zh) {
+          drawCard(el, { word, phonetic: "", definition_en: "",
+                         translation: res.zh + "（浏览器翻译）",
+                         examples: [], cefr_level: "" });
           return;
         }
-        const def = info.definition_en || "";
-        const tr  = info.translation || "";
-        setVocabContext(word, def, tr);
-        const html =
-          `<div class="vp-word">${escapeHtml(info.word)}` +
-          (info.phonetic ? `<span class="vp-phon">${escapeHtml(info.phonetic)}</span>` : "") +
-          (info.cefr_level ? `<span class="vp-level">${escapeHtml(info.cefr_level)}</span>` : "") +
-          `<button class="vp-close" data-close-popup title="Close">✕</button>` +
-          `</div>` +
-          (def ? `<div class="vp-trans">${escapeHtml(def)}</div>` : "") +
-          (tr && tr !== def ? `<div class="vp-trans">${escapeHtml(tr)}</div>` : "") +
-          `<button class="vp-add" data-add-vocab>＋ Add to my words</button>`;
-        showAt(el, html);
+        const reason = (res && res.err) || "failed";
+        const tip = {
+          "no-api": "这个浏览器没有内置翻译引擎（需 Chrome / Edge 138+ 桌面版）",
+          "unavailable": "浏览器没有开放内置翻译，可能被设置或策略关掉了",
+          "no-response": "浏览器内置翻译没有响应（引擎未就绪）",
+          "need-gesture": "语言包还没下载：点一下页面任意处开始下载，约 10-60 秒",
+          "downloading": "正在下载语言包，下好后再悬停一次即可",
+          "failed": "翻译语言包下载失败，请检查网络",
+          "empty": "未获取到释义，请再悬停一次",
+        }[reason] || "翻译不可用";
+        // 内置引擎用不了时给一条退路,但必须由用户点 —— 不默默烧 AI 额度
+        const fallback = reason === "empty"
+          ? ""
+          : `<button class="vp-add" data-online-lookup>用在线词典查这个词</button>`;
+        drawCard(el, { word, phonetic: "", definition_en: "",
+                       translation: tip, examples: [], cefr_level: "" }, fallback);
       });
     }
 
@@ -451,7 +578,9 @@
     });
     // 关闭通道:✕ 按钮 / 弹窗外点击 / Esc
     popup.addEventListener("click", e => {
-      if (e.target.closest("[data-close-popup]")) hide();
+      if (e.target.closest("[data-close-popup]")) { hide(); return; }
+      const btn = e.target.closest("[data-online-lookup]");
+      if (btn) onlineLookup(btn);
     });
     document.addEventListener("click", e => {
       if (popup.hidden) return;
