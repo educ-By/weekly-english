@@ -510,7 +510,8 @@
       const articleId = popup.dataset.articleId;
       const issueKey = popup.dataset.issueKey;
       const definition = popup.dataset.definition || "";
-      const translation = popup.dataset.translation || "";
+      // 浏览器翻译的显示标注不入库
+      const translation = (popup.dataset.translation || "").replace("（浏览器翻译）", "");
       const sentence = popup.dataset.sentence || "";
       btn.disabled = true;
       btn.textContent = "Saving…";
