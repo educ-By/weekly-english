@@ -220,10 +220,17 @@
       popup.hidden = false;
       const pw = popup.offsetWidth;
       const ph = popup.offsetHeight;
+      const sx = window.scrollX || 0;
+      const sy = window.scrollY || 0;
+
       let x = r.left + r.width / 2 - pw / 2;
-      let y = r.top - ph - 4;   // 紧贴单词,不留缝隙,鼠标移过去不会穿过空档
-      if (y < 8) y = r.bottom + 4;
-      x = Math.max(8, Math.min(window.innerWidth - pw - 8, x));
+      // 水平按视口夹住,再折算成文档坐标 —— 弹窗是 absolute,坐标要含滚动偏移
+      x = Math.max(8, Math.min(window.innerWidth - pw - 8, x)) + sx;
+
+      let yView = r.top - ph - 4;   // 紧贴单词,不留缝隙,鼠标移过去不会穿过空档
+      if (yView < 8) yView = r.bottom + 4;
+      const y = Math.max(8, yView + sy);
+
       popup.style.left = x + "px";
       popup.style.top = y + "px";
       // 弹窗复用同一个 DOM,只改 left/top —— 不重放动画的话,连续悬停时它会瞬移到新位置。

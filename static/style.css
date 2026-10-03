@@ -369,9 +369,12 @@ a:hover { color: var(--accent); }
   background: rgba(107,77,143,.12);
 }
 
-/* vocab popup — hover/click gloss */
+/* vocab popup — hover/click gloss
+   position:absolute(不是 fixed):fixed 是相对视口的,悬停后一旦滚动页面,
+   弹窗就留在原地、和它标注的单词脱开几十上百像素,飘在别的段落上。
+   absolute 让它跟着文章内容一起滚,永远贴住那个词。 */
 .vocab-popup {
-  position: fixed;
+  position: absolute;
   z-index: 50;
   max-width: 280px;
   background: #fff;
