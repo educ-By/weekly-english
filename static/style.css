@@ -735,8 +735,7 @@ body.is-selecting { cursor: text; }
 /* print */
 @media print {
   .entry-tools, .foot, .filters, .upload-btn, .nav-link,
-  .site-nav, .nav-burger, .crumbs, .pager, .related,
-  .toc, .vocab-summary { display: none !important; }
+  .site-nav, .nav-burger, .crumbs, .pager, .related { display: none !important; }
   body { background: #fff; }
   .entry { box-shadow: none; border-color: #ccc; page-break-inside: avoid; }
   .entry-meta a.src { border-bottom: 0; }
@@ -751,8 +750,7 @@ body.is-selecting { cursor: text; }
 }
 /* ---- 来源刊物:只在精读页露出;列表 / 卡片仍然不显示 ---- */
 .card .src,
-.level-block .src,
-.toc-item .src { display: none !important; }
+.level-block .src { display: none !important; }
 .filter-group[data-filter="source"] { display: none !important; }
 .entry-meta a.src { border-bottom: 1px solid var(--line); }
 .entry-meta a.src:hover { color: var(--accent); border-color: var(--accent); }
@@ -1140,46 +1138,6 @@ body.is-selecting { cursor: text; }
 .cover-b2 { border-left-color: var(--b2); }
 .cover-c1 { border-left-color: var(--c1); }
 
-.toc { padding: 38px 0 6px; }
-.toc-h2 {
-  font-family: var(--font-serif);
-  font-size: 22px; font-weight: 600;
-  margin: 0 0 18px; padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-}
-.toc-group { margin-bottom: 24px; }
-.toc-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.toc-group-label { font-size: 13px; color: var(--muted); }
-.toc-list { list-style: none; margin: 0; padding: 0; }
-.toc-item {
-  display: grid;
-  grid-template-columns: 38px 1fr auto auto;
-  gap: 14px; align-items: baseline;
-  padding: 10px 6px;
-  border-top: 1px solid var(--line);
-  font-family: var(--font-serif);
-}
-.toc-item:last-child { border-bottom: 1px solid var(--line); }
-.toc-no { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.toc-link { font-size: 17px; line-height: 1.35; transition: color var(--dur) var(--ease); }
-.toc-link:hover { color: var(--accent); }
-.toc-words, .toc-time {
-  font-family: var(--font-sans); font-size: 12px; color: var(--muted);
-  letter-spacing: 0.02em;
-}
-
-/* ---------- 本期词表汇总 ---------- */
-.vocab-summary { padding: 34px 0 4px; }
-.vocab-summary-help {
-  font-family: var(--font-serif); font-style: italic;
-  font-size: 12px; color: var(--muted); margin: 0 0 12px;
-}
-.vocab-count {
-  display: inline-block; margin-left: 6px;
-  font-family: var(--font-sans); font-size: 10px; line-height: 15px;
-  color: var(--paper); background: var(--c-rare);
-  border-radius: 999px; padding: 0 6px; vertical-align: middle;
-}
 a.vocab-word { color: var(--c-rare); }
 a.vocab-word:hover { color: var(--c-rare); }
 
@@ -1307,8 +1265,6 @@ a.vocab-word:hover { color: var(--c-rare); }
   .hero { padding: 40px 0 32px; }
   .hero-title { font-size: 36px; }
   .level-cards { grid-template-columns: 1fr; }
-  .toc-item { grid-template-columns: 30px 1fr; }
-  .toc-words, .toc-time { display: none; }
   .pager { grid-template-columns: 1fr; }
   .pager-next { text-align: left; }
   .related-shared { display: none; }

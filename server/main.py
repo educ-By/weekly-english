@@ -9,6 +9,7 @@ FastAPI 主程序 — Weekly English 后端服务
   - APScheduler:每周一 07:00 自动刷新
 """
 from __future__ import annotations
+import json
 import logging
 import os
 import threading
@@ -108,33 +109,43 @@ def _latest_issue_key() -> Optional[str]:
 # 预渲染成品页的读盘缓存:path → (mtime_ns, size, text)。
 # 一期目录页 180~220KB,同一份文件被反复读盘纯属浪费;顺手带上 ETag,
 # 浏览器后退/来回点文章时走 304,不用重下整篇文档。
-_html_cache: dict[str, tuple[tuple[int, int], str]] = {}
+_file_cache: dict[str, tuple[tuple[int, int], str]] = {}
 
 
-def _html_response(path: Path, request: Request) -> Response:
-    """把磁盘上的成品页返回给浏览器(内存缓存 + ETag/304)。"""
+def _cached_text(path: Path) -> Optional[tuple[str, str]]:
+    """读盘缓存 + 弱 ETag。文件不存在返回 None。"""
     try:
         st = path.stat()
     except OSError:
-        raise HTTPException(404, "Not Found")
+        return None
     stamp = (st.st_mtime_ns, st.st_size)
     etag = f'W/"{stamp[0]:x}-{stamp[1]:x}"'
+    hit = _file_cache.get(str(path))
+    if hit and hit[0] == stamp:
+        return hit[1], etag
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    _file_cache[str(path)] = (stamp, text)
+    return text, etag
 
-    cached = _html_cache.get(str(path))
-    if cached and cached[0] == stamp:
-        text = cached[1]
-    else:
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            raise HTTPException(404, "Not Found")
-        _html_cache[str(path)] = (stamp, text)
 
+def _file_response(path: Path, request: Request, media: str) -> Response:
+    got = _cached_text(path)
+    if got is None:
+        raise HTTPException(404, "Not Found")
+    text, etag = got
     # no-cache = 每次都回来问一句,而不是不许缓存 —— 配合 ETag 才能命中 304
     headers = {"ETag": etag, "Cache-Control": "no-cache"}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
-    return HTMLResponse(text, headers=headers)
+    return Response(content=text, media_type=media, headers=headers)
+
+
+def _html_response(path: Path, request: Request) -> Response:
+    """把磁盘上的成品页返回给浏览器(内存缓存 + ETag/304)。"""
+    return _file_response(path, request, "text/html; charset=utf-8")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -210,6 +221,17 @@ def issue_index(key: str, request: Request):
     if not path.exists():
         raise HTTPException(404, f"Issue {key} not found")
     return _html_response(path, request)
+
+
+@app.get("/issue/{key}/search.json")
+def issue_search_corpus(key: str, request: Request):
+    """本期的全文搜索语料(article_id → 正文)。
+
+    以前这份语料内嵌在目录页每张卡片的 data-body 里,一期 150KB,把页面撑到 220KB+;
+    现在按需取,和 HTML 一样走 ETag/304。
+    """
+    return _file_response(OUT_DIR / key / "search.json", request,
+                          "application/json; charset=utf-8")
 
 
 @app.get("/article/{issue_key}/{article_id}", response_class=HTMLResponse)
@@ -298,6 +320,31 @@ def level_page(level: str):
     return HTMLResponse(html)
 
 
+# 各期全文语料的 mtime 缓存 —— 语料在 search.json 里,不再走 catalog
+_CORPUS_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _issue_corpus(issue_key: str) -> dict:
+    """某一期的全文搜索语料(article_id → 正文)。按 mtime 缓存,不重复读盘。"""
+    path = OUT_DIR / issue_key / "search.json"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return {}
+    hit = _CORPUS_CACHE.get(issue_key)
+    if hit and hit[0] == mtime:
+        return hit[1]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except Exception as e:
+        log.warning("Bad search.json for %s: %s", issue_key, e)
+        data = {}
+    _CORPUS_CACHE[issue_key] = (mtime, data)
+    return data
+
+
 @app.get("/search", response_class=HTMLResponse)
 def search_page(q: str = ""):
     """全站搜索 —— 结果有自己的 URL,可分享、可回退。"""
@@ -306,8 +353,9 @@ def search_page(q: str = ""):
     if query:
         needle = query.lower()
         for issue in _catalog():
+            corpus = _issue_corpus(issue["key"])
             for a in issue["articles"]:
-                haystack = f"{a.get('title', '')}\n{a.get('search', '')}".lower()
+                haystack = f"{a.get('title', '')}\n{corpus.get(a['id'], '')}".lower()
                 if needle in haystack:
                     results.append({
                         "id": a["id"],
@@ -701,21 +749,29 @@ def _load_articles_context(issue_key: str) -> list[dict]:
 
 # ---------- 启动时不阻塞:后台线程做初始抓取 ----------
 def _background_refresh_once():
-    # 0) 磁盘上现成的页面引用的是渲染那一刻的资源版本号 —— 先就地改写,
+    # 0) 老期页面 + 老 meta.json 的就地迁移(先备份再改)。
+    #    语料抽到 search.json、删掉编号目录与词汇汇总块、去掉内嵌 data-body、修旧文案。
+    #    必须在 refresh_asset_versions 之前 —— 这样备份里存的是"这轮改动之前"的原样。
+    try:
+        core.migrate_rendered_data(OUT_DIR)
+    except Exception as e:
+        log.warning("Rendered-data migration failed: %s", e)
+
+    # 1) 磁盘上现成的页面引用的是渲染那一刻的资源版本号 —— 先就地改写,
     #    免得浏览器继续用缓存里的旧 app.js / style.css(不联网,很快)
     try:
         core.refresh_asset_versions(OUT_DIR)
     except Exception as e:
         log.warning("Asset version refresh failed: %s", e)
 
-    # 1) 改造前生成的期没有 meta.json —— 就地从它们自己的 HTML 重渲染,保证全站模板一致
+    # 2) 改造前生成的期没有 meta.json —— 就地从它们自己的 HTML 重渲染,保证全站模板一致
     try:
         rebuilt = core.rebuild_legacy_issues(OUT_DIR)
     except Exception as e:
         rebuilt = 0
         log.warning("Legacy issue rebuild failed: %s", e)
 
-    # 2) catalog.json 缺失(旧卷)或刚迁移过 —— 重建首页 / archive / 跨期索引
+    # 3) catalog.json 缺失(旧卷)或刚迁移过 —— 重建首页 / archive / 跨期索引
     if rebuilt or not (OUT_DIR / "catalog.json").exists():
         try:
             issues = core.scan_issues(OUT_DIR)
@@ -726,7 +782,7 @@ def _background_refresh_once():
         except Exception as e:
             log.warning("Landing rebuild failed: %s", e)
 
-    # 3) 一期都没有时才联网抓取
+    # 4) 一期都没有时才联网抓取
     if not (OUT_DIR / "index.html").exists():
         try:
             core.full_refresh(OUT_DIR)

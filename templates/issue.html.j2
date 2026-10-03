@@ -30,48 +30,6 @@
     </div>
   </section>
 
-  <section class="toc">
-    <h2 class="toc-h2">Contents</h2>
-    {% set ns = namespace(n=0) %}
-    {% for lvl, label in [("B1", "入门"), ("B2", "进阶"), ("C1", "高阶")] %}
-    {% set group = articles | selectattr("level", "equalto", lvl) | list %}
-    {% if group %}
-    <div class="toc-group">
-      <div class="toc-group-head">
-        <span class="chip chip-{{ lvl|lower }}">{{ lvl }}</span>
-        <span class="toc-group-label">{{ label }} · {{ group|length }} 篇</span>
-      </div>
-      <ol class="toc-list">
-        {% for art in group %}
-        {% set ns.n = ns.n + 1 %}
-        <li class="toc-item">
-          <span class="toc-no">{{ "%02d"|format(ns.n) }}</span>
-          <a class="toc-link" href="/issue/{{ issue.key }}/article-{{ art.id }}.html">{{ art.title }}</a>
-          <span class="toc-words">{{ art.stats.total_words }} words</span>
-          <span class="toc-time">{{ art.published_display }}</span>
-        </li>
-        {% endfor %}
-      </ol>
-    </div>
-    {% endif %}
-    {% endfor %}
-  </section>
-
-  {% if vocab_summary %}
-  <section class="vocab-summary">
-    <h2 class="toc-h2">Vocabulary in this issue</h2>
-    <p class="vocab-summary-help">
-      Words below sit outside the 3,500-word gaokao list.
-      Click one to find the pieces it appears in.
-    </p>
-    <div class="vocab-list">
-      {% for w in vocab_summary %}
-      <a class="vocab-word vocab-rare" href="/search?q={{ w.word|urlencode }}">{{ w.word }}<span class="vocab-count">{{ w.count }}</span></a>
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
-
   <section class="filters" aria-label="Search and filter this issue">
     <div class="filter-row">
       <label class="search">
@@ -110,10 +68,10 @@
       {% for art in group_cards %}
       <a class="card card-{{ art.level|lower }}"
          href="/issue/{{ issue.key }}/article-{{ art.id }}.html"
+         data-id="{{ art.id }}"
          data-title="{{ art.title | e }}"
          data-level="{{ art.level | e }}"
-         data-source="{{ art.source | e }}"
-         data-body="{{ art.body_search | e }}">
+         data-source="{{ art.source | e }}">
         <div class="card-head">
           <span class="src">{{ art.source }}</span>
           <span class="chip chip-{{ art.level|lower }}">{{ art.level }}</span>

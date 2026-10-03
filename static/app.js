@@ -88,6 +88,74 @@
 
     if (search && params.get("q")) search.value = params.get("q");
 
+    // 卡片索引只建一次。以前每次敲键都要重新遍历 54 张卡、再对**每张卡内嵌的整篇
+    // 正文**做 toLowerCase() —— 一期正文约 150KB,那就是"边打字边卡"的主因。
+    const items = cards.map(card => {
+      const href = card.getAttribute("href") || "";
+      const m = href.match(/article-([^/.]+)\.html/);
+      return {
+        el: card,
+        id: card.dataset.id || (m ? m[1] : ""),
+        title: (card.dataset.title || "").toLowerCase(),
+        level: card.dataset.level || "",
+        source: card.dataset.source || "",
+        body: null,                       // 全文语料到位后才填
+      };
+    });
+    const byId = new Map(items.filter(it => it.id).map(it => [it.id, it]));
+
+    // ---- 全文语料:不进首屏,空闲时预取 ----
+    // 语料已挪到同期的 search.json(以前内嵌在每张卡片的 data-body 里,
+    // 让目录页从几十 KB 涨到 220KB+)。空闲时悄悄拉,正常打字时它已经到了。
+    const issueKey = document.body.dataset.issueKey
+      || (location.pathname.match(/(\d{4}-W\d{2})/) || [])[1] || "";
+    let corpusPromise = null;
+    let corpusDone = false;
+
+    function loadCorpus() {
+      if (corpusPromise || !issueKey || !items.some(it => it.id)) return corpusPromise;
+      corpusPromise = fetch(`/issue/${issueKey}/search.json`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(map => {
+          if (map) {
+            for (const id in map) {
+              const it = byId.get(id);
+              if (it) it.body = (map[id] || "").toLowerCase();
+            }
+          }
+        })
+        .catch(() => {})                  // 拉不到就退化成只搜标题,别反复重试
+        .then(() => { corpusDone = true; apply(); });
+      return corpusPromise;
+    }
+
+    function prefetchCorpus() {
+      if (navigator.connection && (navigator.connection.saveData
+          || /(^|-)2g$/.test(navigator.connection.effectiveType || ""))) return;
+      if (window.requestIdleCallback) requestIdleCallback(loadCorpus, { timeout: 3000 });
+      else setTimeout(loadCorpus, 1200);
+    }
+
+    // ---- 悬停预取目标文章页 ----
+    // 文章页只有十几 KB,顺手取回来,点下去几乎是瞬开。
+    // 同一张卡只取一次;省流量模式或 2G 下不做。
+    const prefetched = new Set();
+    function prefetchArticle(card) {
+      const href = card.getAttribute("href");
+      if (!href || prefetched.has(href)) return;
+      if (navigator.connection && (navigator.connection.saveData
+          || /(^|-)2g$/.test(navigator.connection.effectiveType || ""))) return;
+      prefetched.add(href);
+      const link = document.createElement("link");
+      link.rel = "prefetch";
+      link.as = "document";
+      link.href = href;
+      document.head.appendChild(link);
+    }
+    cards.forEach(card => {
+      card.addEventListener("pointerenter", () => prefetchArticle(card), { once: false });
+    });
+
     // 把当前筛选写回地址栏 —— 结果可分享、可回退,而不是一次性的页面内状态
     let urlTimer = null;
     function syncUrl() {
@@ -105,20 +173,19 @@
     function apply() {
       const q = (search?.value || "").trim().toLowerCase();
       const filtering = !!q || level !== "all" || source !== "all";
+      // 要搜正文但语料还没到 —— 立刻去取,取回来自会重跑一遍 apply()
+      if (q && !corpusDone) loadCorpus();
       let n = 0;
       const blockVisible = {};
-      cards.forEach(card => {
-        const title = (card.dataset.title || "").toLowerCase();
-        const body = (card.dataset.body || "").toLowerCase();
-        const lvl = card.dataset.level || "";
-        const src = card.dataset.source || "";
-        const matchQ = !q || title.includes(q) || body.includes(q);
-        const matchL = level === "all" || lvl === level;
-        const matchS = source === "all" || src === source;
+      for (const it of items) {
+        const matchQ = !q || it.title.includes(q)
+                    || (it.body !== null && it.body.includes(q));
+        const matchL = level === "all" || it.level === level;
+        const matchS = source === "all" || it.source === source;
         const show = matchQ && matchL && matchS;
-        card.style.display = show ? "" : "none";
-        if (show) { n += 1; blockVisible[lvl] = (blockVisible[lvl] || 0) + 1; }
-      });
+        it.el.style.display = show ? "" : "none";
+        if (show) { n += 1; blockVisible[it.level] = (blockVisible[it.level] || 0) + 1; }
+      }
       // 分层联动:筛选/搜索时自动展开所有层,没有命中内容的层整层隐藏
       // 不带动画 —— 边打字边展开会拖慢手感
       document.querySelectorAll(".level-block").forEach(block => {
@@ -126,9 +193,18 @@
         const lvl = block.dataset.block || "";
         block.hidden = filtering && !!lvl && !blockVisible[lvl];
       });
-      if (status) status.textContent = `Showing ${n} of ${cards.length}`;
+      let label = `Showing ${n} of ${cards.length}`;
+      if (q && !corpusDone) label += " · searching full text…";
+      if (status) status.textContent = label;
       if (empty) empty.hidden = n !== 0;
       syncUrl();
+    }
+
+    // 输入防抖 —— 语料已经不在 DOM 里了,但连打时仍没必要每键都跑一遍筛选
+    let inputTimer = null;
+    function onInput() {
+      clearTimeout(inputTimer);
+      inputTimer = setTimeout(apply, 150);
     }
 
     // 层标题点击 = 折叠/展开该层
@@ -168,8 +244,9 @@
       .forEach(b => b.classList.toggle("is-on",
         (b.dataset.value || "").toUpperCase() === level));
 
-    search?.addEventListener("input", apply);
+    search?.addEventListener("input", onInput);
     apply();
+    prefetchCorpus();
   }
 
   /* ---------------- 精读页:生词高亮 ---------------- */

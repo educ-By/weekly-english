@@ -29,13 +29,20 @@ from pipeline.summary import offline_summary
 
 log = logging.getLogger(__name__)
 
+# 渲染产物备份:就地改写老期页面之前先存一份,保留最近 N 份
+BACKUP_DIR_NAME = "backup"
+BACKUP_KEEP = 3
+
+# 渲染产物的就地迁移版本 —— 改一次迁移逻辑就 +1,老卷上会重新跑一遍
+RENDER_MIGRATE_VERSION = 1
+
 # 静态资源版本号 —— static/ 下哪个文件改了就把对应数字 +1。
 # 页面是预渲染到磁盘的死 HTML,模板改了不会自动影响已经落盘的成品,
 # 所以启动时会用 refresh_asset_versions() 就地重写这些引用;否则老用户
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
-    "app.js": 43,
-    "style.css": 33,
+    "app.js": 44,
+    "style.css": 34,
     "me.js": 1,
     "auth.js": 1,
 }
@@ -407,8 +414,196 @@ _env = jinja2.Environment(
 _env.globals["asset"] = asset
 
 
+def rendered_dir(out_dir: Path) -> Path:
+    """渲染目录的真实路径。
+
+    本地 `data/output` 是指向 `data/preview` 的符号链接,遍历和备份都要取解析后的
+    目录,否则会把链接本身当目录树。
+    """
+    try:
+        return out_dir.resolve()
+    except OSError:
+        return out_dir
+
+
+def _prune_backups(dest_root: Path, keep: int = BACKUP_KEEP) -> None:
+    try:
+        snaps = sorted((p for p in dest_root.iterdir() if p.is_dir()), reverse=True)
+    except OSError:
+        return
+    for old in snaps[keep:]:
+        try:
+            shutil.rmtree(old)
+            log.info("Pruned old backup %s", old)
+        except Exception as e:
+            log.warning("Prune failed for %s: %s", old, e)
+
+
+def backup_rendered(out_dir: Path, reason: str) -> Optional[Path]:
+    """把渲染产物整体备份一份,返回备份目录(失败返回 None)。
+
+    就地改写老期 HTML 之前必须先备份 —— 那些期没有源数据,改坏就捞不回来。
+    回滚:cp -r <备份目录>/. <out_dir>/
+    """
+    src = rendered_dir(out_dir)
+    if not src.is_dir():
+        return None
+    dest_root = src.parent / BACKUP_DIR_NAME
+    dest = dest_root / f"{dt.datetime.now():%Y%m%d-%H%M%S}-{reason}"
+    try:
+        dest_root.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dest, symlinks=True,
+                        ignore=shutil.ignore_patterns(BACKUP_DIR_NAME))
+    except Exception as e:
+        log.warning("Backup failed (%s): %s", dest, e)
+        return None
+    _prune_backups(dest_root)
+    log.info("Backed up rendered data to %s (rollback: cp -r %s/. %s/)",
+             dest, dest, out_dir)
+    return dest
+
+
+def extract_search_corpus(out_dir: Path) -> int:
+    """把每期的全文搜索语料从 meta.json 搬到同目录的 search.json。
+
+    语料(一期约 150KB)以前同时躺在三处:目录页 HTML 的 data-body、meta.json、
+    catalog.json。抽成一份 sidecar 之后,目录页从 220KB+ 降到几十 KB,
+    meta.json / catalog.json 也跟着瘦下来。幂等:已有 search.json 的期跳过。
+    """
+    if not out_dir.exists():
+        return 0
+    moved = 0
+    for issue_dir in sorted(p for p in out_dir.iterdir() if p.is_dir()):
+        meta_path = issue_dir / "meta.json"
+        corpus_path = issue_dir / "search.json"
+        if corpus_path.exists() or not meta_path.exists():
+            continue
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            log.warning("Skipping corpus extraction for %s: %s", issue_dir.name, e)
+            continue
+        articles = meta.get("articles") or []
+        corpus = {a["id"]: a.get("search", "") for a in articles if a.get("id")}
+        if not any(corpus.values()):
+            continue
+        try:
+            corpus_path.write_text(json.dumps(corpus, ensure_ascii=False),
+                                   encoding="utf-8")
+            for a in articles:
+                a.pop("search", None)
+            meta_path.write_text(json.dumps(meta, ensure_ascii=False),
+                                 encoding="utf-8")
+            moved += 1
+            log.info("Extracted search corpus for %s (%d articles, %.0f KB)",
+                     issue_dir.name, len(corpus), len(json.dumps(corpus)) / 1024)
+        except Exception as e:
+            log.warning("Corpus extraction failed for %s: %s", issue_dir.name, e)
+    return moved
+
+
+# 就地改写老期页面时的文案修正(模板早已改好,卷上那些是更早的渲染产物)
+_COPY_FIXES = (
+    ("Words below sit outside the standard high-school / CET-4+6 lists.",
+     "Words below sit outside the 3,500-word gaokao list."),
+)
+
+_SECTION_RE = {
+    "toc": re.compile(r'\n?\s*<section class="toc">.*?</section>\s*', re.S),
+    "vocab": re.compile(r'\n?\s*<section class="vocab-summary">.*?</section>\s*', re.S),
+}
+_DATA_BODY_RE = re.compile(r'\s*data-body="[^"]*"')
+_CARD_COUNT_RE = re.compile(r'<a class="card ')
+
+
+def migrate_rendered_pages(out_dir: Path) -> int:
+    """就地更新已渲染的页面,让老期跟上当前模板:去掉内嵌全文、删掉编号目录与
+    词汇汇总块、修正旧文案。
+
+    写前逐文件校验(仍是完整 HTML、卡片数不变、没有残留 data-body),任一项不过就
+    跳过该文件并告警 —— 宁可不改,也不要把老期改坏。幂等,可反复跑。
+    """
+    if not out_dir.exists():
+        return 0
+    changed = skipped = 0
+    for page in out_dir.rglob("*.html"):
+        try:
+            txt = page.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        if "data-body=" not in txt and '<section class="toc">' not in txt \
+                and '<section class="vocab-summary">' not in txt \
+                and "standard high-school" not in txt:
+            continue                       # 已经是新模样,不动
+
+        new = _DATA_BODY_RE.sub("", txt)
+        for rx in _SECTION_RE.values():
+            new = rx.sub("\n", new)
+        for old, repl in _COPY_FIXES:
+            new = new.replace(old, repl)
+
+        # 校验:结构没被改坏才落盘
+        if "</html>" not in new:
+            log.warning("Skip migrate (no </html>): %s", page); skipped += 1; continue
+        if len(_CARD_COUNT_RE.findall(new)) != len(_CARD_COUNT_RE.findall(txt)):
+            log.warning("Skip migrate (card count changed): %s", page); skipped += 1; continue
+        if "data-body=" in new:
+            log.warning("Skip migrate (data-body survived): %s", page); skipped += 1; continue
+
+        if new == txt:
+            continue
+        try:
+            page.write_text(new, encoding="utf-8")
+            changed += 1
+        except Exception as e:
+            log.warning("Migrate write failed for %s: %s", page, e); skipped += 1
+    if changed or skipped:
+        log.info("Rendered-page migration: %d rewritten, %d skipped", changed, skipped)
+    return changed
+
+
+def migrate_rendered_data(out_dir: Path) -> dict:
+    """启动时的一次性整理:先备份,再抽语料 + 就地更新老页面,最后重建 catalog。
+
+    用标记文件保证只跑一次(幂等,重跑也不会重复备份)。
+    """
+    out = {"backed_up": None, "corpus": 0, "pages": 0}
+    real = rendered_dir(out_dir)
+    marker = real.parent / f".render-migrate-{RENDER_MIGRATE_VERSION}"
+    if marker.exists():
+        return out
+    if not real.is_dir():
+        return out
+
+    snap = backup_rendered(out_dir, "pre-migrate")
+    if snap is None:
+        log.warning("Migration skipped: backup could not be created")
+        return out
+    out["backed_up"] = str(snap)
+
+    out["corpus"] = extract_search_corpus(out_dir)
+    out["pages"] = migrate_rendered_pages(out_dir)
+    if out["corpus"]:
+        try:
+            build_catalog(out_dir)
+        except Exception as e:
+            log.warning("Catalog rebuild after corpus extraction failed: %s", e)
+
+    try:
+        marker.write_text(dt.datetime.now().isoformat(timespec="seconds"),
+                          encoding="utf-8")
+    except Exception as e:
+        log.warning("Could not write migration marker: %s", e)
+    log.info("Rendered-data migration done: %s", out)
+    return out
+
+
 def article_meta(a: dict) -> dict:
-    """catalog / meta.json 里的单篇摘要 —— 只保留跨期页面需要的字段。"""
+    """catalog / meta.json 里的单篇摘要 —— 只保留跨期页面需要的字段。
+
+    注意这里**不含正文**(`body_search`)—— 全文语料单独放同期的 `search.json`,
+    否则 meta.json 一期就 160KB+,catalog.json 直接 400KB+。
+    """
     return {
         "id": a["id"],
         "title": a["title"],
@@ -418,7 +613,6 @@ def article_meta(a: dict) -> dict:
         "deck": a.get("deck", ""),
         "url": a.get("url", ""),
         "source": a.get("source", ""),
-        "search": a.get("body_search", ""),
     }
 
 
@@ -480,8 +674,7 @@ def render_issue_to_dir(articles: list[dict],
         "nav": "issue",
     }
 
-    issue_html = _env.get_template("issue.html.j2").render(
-        page="index", vocab_summary=vocab_summary(articles), **issue_ctx)
+    issue_html = _env.get_template("issue.html.j2").render(page="index", **issue_ctx)
     (out_dir / "index.html").write_text(issue_html, encoding="utf-8")
 
     art_tpl = _env.get_template("article.html.j2")
@@ -507,6 +700,12 @@ def render_issue_to_dir(articles: list[dict],
     }
     (out_dir / "meta.json").write_text(
         json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+
+    # 全文搜索语料单独一份:目录页、meta.json、catalog.json 都不该扛着它。
+    # 一期正文约 150KB,内嵌会让目录页从几十 KB 涨到 220KB+。
+    corpus = {a["id"]: a.get("body_search", "") for a in articles}
+    (out_dir / "search.json").write_text(
+        json.dumps(corpus, ensure_ascii=False), encoding="utf-8")
 
     log.info("Rendered issue: %s (%d articles)", out_dir, len(articles))
     return out_dir

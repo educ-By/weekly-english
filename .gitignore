@@ -1,5 +1,7 @@
 data/output/
 data/preview/
+data/backup/
+data/.render-migrate-*
 __pycache__/
 *.pyc
 .env
