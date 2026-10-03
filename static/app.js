@@ -185,16 +185,24 @@
       return btReady;
     }
 
+    let btStatus = "idle";   // idle | downloading | ready
+
     async function browserTranslate(word) {
       if (btCache.has(word)) return btCache.get(word);
       const p = (async () => {
         try {
+          if (typeof Translator === "undefined") return { err: "unsupported" };
+          const avail = await Translator.availability({ sourceLanguage: "en", targetLanguage: "zh" });
+          if (avail === "unavailable") return { err: "unsupported" };
+          if (avail !== "available") btStatus = "downloading";
           const t = await btGetTranslator();
-          if (!t) return null;
+          if (!t) return { err: "unsupported" };
+          btStatus = "ready";
           const out = (await t.translate(word)) || "";
-          return out.trim() || null;
-        } catch (_) {
-          return null;   // 老浏览器/下载失败 → 回退后端词典
+          return out.trim() ? { zh: out.trim() } : { err: "empty" };
+        } catch (e) {
+          // 语言包下载被阻止(需要用户手势)或下载失败
+          return { err: "blocked" };
         }
       })();
       btCache.set(word, p);
@@ -249,19 +257,22 @@
         showAt(el,
           `<div class="vp-word">${escapeHtml(word)}` +
           `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
-          `<div class="vp-trans vp-loading">查询中…</div>`);
+          `<div class="vp-trans vp-loading">` +
+          (btStatus === "downloading" ? "正在下载翻译语言包…" : "翻译中…") +
+          `</div>`);
       }
-      // 浏览器翻译最多等 1.5 秒(语言包未就绪时不阻塞),超时用后端词典兜底
-      const viaBrowser = Promise.race([
-        browserTranslate(word),
-        new Promise(res => setTimeout(() => res(null), 1500)),
-      ]).then(zh =>
-        zh ? { ok: true, word, phonetic: "", definition_en: "",
-               translation: zh + "（浏览器翻译）", examples: [], cefr_level: "" } : null);
-      Promise.resolve(viaBrowser).then(info => {
-        if (info) return info;
-        return lookup(word, ctx);
-      }).then(info => {
+      // 只用浏览器内置翻译 — 单词查词不调用任何 AI
+      browserTranslate(word).then(res => {
+        const info = res && res.zh
+          ? { word, phonetic: "", definition_en: "",
+              translation: res.zh + "（浏览器翻译）", examples: [], cefr_level: "" }
+          : { word, phonetic: "", definition_en: "",
+              translation: {
+                unsupported: "此浏览器不支持内置翻译 — 请用 Chrome / Edge 打开（无需联网 AI）",
+                blocked: "首次使用需下载翻译语言包：请先点击页面任意处，等 10-30 秒后再悬停",
+                empty: "未获取到释义，请再悬停一次",
+              }[res && res.err] || "翻译不可用",
+              examples: [], cefr_level: "" };
         if (!active || active.word !== word) return;
         // 弹窗已展示同一词的完整内容时不要重建 DOM —
         // 否则迟到的响应会在用户点击按钮的瞬间替换按钮,点击落空
