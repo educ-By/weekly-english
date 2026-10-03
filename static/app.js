@@ -322,6 +322,8 @@
     function hide() {
       popup.hidden = true;
       active = null;
+      clearSel();
+      activeSel = null;
     }
 
     // 滚动即关闭:滚动时弹窗会从那个词旁边漂开(它只定位一次,不逐帧跟随),
@@ -592,9 +594,8 @@
 
     article.addEventListener("mouseover", onEnter);
     article.addEventListener("click", e => {
-      // 划词(非折叠选区)时不抢 .rare 的点击,避免和选区工具条打架
-      const sel = window.getSelection();
-      if (sel && !sel.isCollapsed) return;
+      // 自绘划词有选区时不抢 .rare 的点击,避免和选区工具条打架
+      if (activeSel && activeSel.toString().trim()) return;
       const el = e.target.closest(".rare, .vocab-word");
       if (el && article.contains(el)) onEnter({ target: el });
     });
@@ -604,48 +605,115 @@
       const btn = e.target.closest("[data-online-lookup]");
       if (btn) { onlineLookup(btn); return; }
       const sbtn = e.target.closest("[data-selection-lookup]");
-      if (sbtn) selectionLookup(sbtn);
+      if (sbtn) { selectionLookup(sbtn); return; }
+      const cbtn = e.target.closest("[data-selection-copy]");
+      if (cbtn) copySelection(cbtn);
     });
     document.addEventListener("click", e => {
       if (popup.hidden) return;
       if (popup.contains(e.target) || e.target.closest(".rare, .vocab-word")) return;
-      // 划词后紧接的 click 不要关掉刚弹出的工具条
-      const sel = window.getSelection();
-      if (sel && !sel.isCollapsed) return;
+      // 自绘划词有选区时,紧接的 click 不要关掉刚弹出的工具条
+      if (activeSel && activeSel.toString().trim()) return;
       hide();
     });
     document.addEventListener("keydown", e => {
       if (e.key === "Escape" && !popup.hidden) hide();
     });
 
-    // ---- 划词:选中正文里任意单词/短语 → 翻译 / 加入生词本 ----
-    // 与悬停查词共用同一个弹窗与 dataset 契约(加入生词本的按钮直接复用)。
-    let selTimer = null;
-    function onSelectionEnd() {
-      clearTimeout(selTimer);
-      selTimer = setTimeout(() => {
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || !sel.rangeCount) return;
-        const raw = sel.toString().replace(/\s+/g, " ").trim();
-        if (!raw || raw.length > 80) return;              // 过长(整段)忽略
-        if (!/^[A-Za-z][A-Za-z'’.\-\s]*$/.test(raw)) return; // 只认英文词/短语
-        const range = sel.getRangeAt(0);
-        const node = range.commonAncestorContainer;
-        const body = article.querySelector(".entry-body");
-        if (!body || !body.contains(node) || popup.contains(node)) return;
-        const el = node.nodeType === 1 ? node : node.parentElement;
-        const p = (el && (el.closest("p") || el.closest(".entry-body"))) || body;
-        const rect = range.getBoundingClientRect();
-        const word = raw.toLowerCase();
-        active = { el: null, anchor: rect, word, ctx: p.textContent.trim().slice(0, 240) };
-        setVocabContext(word, "", "", active.ctx);
-        showAt(rect,
-          `<div class="vp-word">${escapeHtml(raw)}` +
-          `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
-          `<div class="vp-sel-actions">` +
-          `<button class="vp-trans-btn" data-selection-lookup>Translate</button>` +
-          `<button class="vp-add" data-add-vocab>＋ Add to my words</button></div>`);
-      }, 0);
+    // ---- 自绘划词:正文已关掉原生选择(user-select:none),选区与系统菜单都由我们接管 ----
+    // 用指针事件自己算 Range + 画高亮层,浏览器的选区菜单/长按菜单根本不会出现。
+    const selLayer = document.createElement("div");
+    selLayer.className = "sel-layer";
+    document.body.appendChild(selLayer);
+    let activeSel = null;      // 当前自绘选区(供复制/取词)
+    let selAnchor = null;      // 起点 caret
+    let selecting = false;
+    let longPress = null;
+    const bodyEl = article.querySelector(".entry-body");
+    const clearSel = () => { selLayer.innerHTML = ""; };
+
+    function caretRangeAt(x, y) {
+      if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+      if (document.caretPositionFromPoint) {           // Firefox
+        const p = document.caretPositionFromPoint(x, y);
+        if (!p) return null;
+        const r = document.createRange();
+        r.setStart(p.offsetNode, p.offset);
+        r.collapse(true);
+        return r;
+      }
+      return null;
+    }
+    function inBody(node) {
+      if (!bodyEl || !node) return false;
+      const el = node.nodeType === 1 ? node : node.parentElement;
+      return !!(el && bodyEl.contains(el));
+    }
+    function paintRange(range) {
+      clearSel();
+      const sx = window.scrollX || 0, sy = window.scrollY || 0;
+      for (const r of range.getClientRects()) {
+        if (r.width < 1 || r.height < 1) continue;
+        const d = document.createElement("div");
+        d.className = "sel-rect";
+        d.style.cssText = `left:${r.left + sx}px;top:${r.top + sy}px;width:${r.width}px;height:${r.height}px`;
+        selLayer.appendChild(d);
+      }
+    }
+    function beginSelect(x, y) {
+      const r = caretRangeAt(x, y);
+      if (!r || !inBody(r.startContainer)) return false;
+      selAnchor = { node: r.startContainer, offset: r.startOffset };
+      selecting = true;
+      activeSel = null;
+      document.body.classList.add("is-selecting");
+      return true;
+    }
+    function updateSelect(x, y) {
+      if (!selecting || !selAnchor) return;
+      const cur = caretRangeAt(x, y);
+      if (!cur || !inBody(cur.startContainer)) return;
+      const a = document.createRange();
+      a.setStart(selAnchor.node, selAnchor.offset);
+      a.collapse(true);
+      const range = document.createRange();
+      try {
+        if (a.compareBoundaryPoints(Range.START_TO_START, cur) <= 0) {
+          range.setStart(selAnchor.node, selAnchor.offset);
+          range.setEnd(cur.startContainer, cur.startOffset);
+        } else {
+          range.setStart(cur.startContainer, cur.startOffset);
+          range.setEnd(selAnchor.node, selAnchor.offset);
+        }
+      } catch (_) { return; }
+      activeSel = range;
+      paintRange(range);
+    }
+    function endSelect() {
+      const was = selecting;
+      selecting = false;
+      document.body.classList.remove("is-selecting");
+      if (longPress) { clearTimeout(longPress); longPress = null; }
+      if (!was) return;                    // 只在一次真正拖选结束时动作,避免误触复发
+      if (!activeSel) { clearSel(); return; }
+      const raw = activeSel.toString().replace(/\s+/g, " ").trim();
+      if (!raw || raw.length > 80 || !/^[A-Za-z][A-Za-z'’.\-\s]*$/.test(raw)) {
+        clearSel(); activeSel = null; return;
+      }
+      const sn = activeSel.startContainer;
+      const el = sn.nodeType === 1 ? sn : sn.parentElement;
+      const p = (el && (el.closest("p") || el.closest(".entry-body"))) || bodyEl;
+      const rect = activeSel.getBoundingClientRect();
+      const word = raw.toLowerCase();
+      active = { el: null, anchor: rect, word, ctx: p ? p.textContent.trim().slice(0, 240) : "" };
+      setVocabContext(word, "", "", active.ctx);
+      showAt(rect,
+        `<div class="vp-word">${escapeHtml(raw)}` +
+        `<button class="vp-close" data-close-popup title="Close">✕</button></div>` +
+        `<div class="vp-sel-actions">` +
+        `<button class="vp-trans-btn" data-selection-lookup>Translate</button>` +
+        `<button class="vp-trans-btn" data-selection-copy>Copy</button>` +
+        `<button class="vp-add" data-add-vocab>＋ Add to my words</button></div>`);
     }
     async function selectionLookup(btn) {
       if (!active) return;
@@ -674,8 +742,61 @@
         btn.textContent = "翻译失败，重试";
       }
     }
-    article.addEventListener("mouseup", onSelectionEnd);
-    document.addEventListener("touchend", onSelectionEnd, { passive: true });
+    async function copySelection(btn) {
+      const text = (activeSel && activeSel.toString()) || (active && active.word) || "";
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {                      // 非安全上下文/无权限时的退路
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.cssText = "position:fixed;opacity:0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        ta.remove();
+      }
+      btn.textContent = "Copied ✓";
+      setTimeout(() => { btn.textContent = "Copy"; }, 1200);
+    }
+
+    if (bodyEl) {
+      bodyEl.addEventListener("pointerdown", e => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        if (e.pointerType === "touch") {          // 触摸:长按 400ms 才进入划词
+          longPress = setTimeout(() => { longPress = null; beginSelect(e.clientX, e.clientY); }, 400);
+          return;
+        }
+        beginSelect(e.clientX, e.clientY);
+      });
+      bodyEl.addEventListener("pointermove", e => {
+        if (selecting) { updateSelect(e.clientX, e.clientY); return; }
+        if (longPress) { clearTimeout(longPress); longPress = null; }  // 一动即视为滚动
+      });
+      // 触摸划词期间阻止页面滚动(必须非 passive 才能 preventDefault)
+      bodyEl.addEventListener("touchmove", e => { if (selecting) e.preventDefault(); }, { passive: false });
+      // 双击选词
+      bodyEl.addEventListener("dblclick", e => {
+        const r = caretRangeAt(e.clientX, e.clientY);
+        if (!r || !inBody(r.startContainer)) return;
+        const t = r.startContainer;
+        if (t.nodeType !== 3) return;
+        const txt = t.textContent;
+        const isW = c => /[A-Za-z'’\-]/.test(c);
+        let s = r.startOffset, en = r.startOffset;
+        while (s > 0 && isW(txt[s - 1])) s--;
+        while (en < txt.length && isW(txt[en])) en++;
+        if (s === en) return;
+        const range = document.createRange();
+        range.setStart(t, s);
+        range.setEnd(t, en);
+        activeSel = range;
+        paintRange(range);
+        endSelect();
+      });
+      window.addEventListener("pointerup", endSelect);
+      window.addEventListener("pointercancel", endSelect);
+    }
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => ({

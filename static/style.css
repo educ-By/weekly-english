@@ -369,6 +369,22 @@ a:hover { color: var(--accent); }
   background: rgba(107,77,143,.12);
 }
 
+/* 自绘划词 —— 关闭原生选择(连带系统/浏览器选择菜单),选区高亮由 .sel-layer 自己画 */
+.entry-body, .entry-body * {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
+body.is-selecting { cursor: text; }
+.sel-layer {
+  position: absolute; top: 0; left: 0; width: 0; height: 0;
+  z-index: 40; pointer-events: none;
+}
+.sel-layer .sel-rect {
+  position: absolute;
+  background: rgba(107,77,143,.22);
+  border-radius: 2px;
+}
+
 /* vocab popup — hover/click gloss
    position:absolute(不是 fixed):fixed 是相对视口的,悬停后一旦滚动页面,
    弹窗就留在原地、和它标注的单词脱开几十上百像素,飘在别的段落上。
