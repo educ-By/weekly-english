@@ -151,9 +151,18 @@ def summarize_zh(title: str, body: str, model: str | None = None) -> str:
             resp = client.chat.completions.create(
                 model=model or cfg["model"],
                 messages=[{"role": "user", "content": use_prompt}],
-                max_tokens=800, temperature=0.2, **extra)
-            lines = (resp.choices[0].message.content or "").strip().splitlines()
+                max_tokens=1200, temperature=0.2, **extra)
+            msg = resp.choices[0].message
+            lines = (msg.content or "").strip().splitlines()
             out = lines[0].strip() if lines else ""
+            if not (out and _re_cjk.search(out)):
+                # 思考型模型正文为空/无中文 → 从 reasoning_content 里找中文句子
+                rc = getattr(msg, "reasoning_content", None) or ""
+                for piece in re.split(r"[\n。;；]", rc):
+                    cand = piece.strip()
+                    if cand and _re_cjk.search(cand) and 6 <= len(cand) <= 80:
+                        out = cand
+                        break
             if out and _re_cjk.search(out):
                 break
             out = ""
