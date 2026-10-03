@@ -51,7 +51,7 @@ def _cfg(*groups: str) -> dict:
     """按顺序取第一个配置了 API_KEY 的组;每组形如 {G}_API_KEY / {G}_BASE_URL / {G}_MODEL。
     任何 OpenAI ChatCompletions 兼容端点都可用(DeepSeek / 智谱 BigModel / Kimi / 通义 等)。
     例:ask() 用 _cfg("ASK", "DEEPSEEK", "LLM") — 交流优先 DeepSeek;
-        lookup_word() 用 _cfg("LLM", "DEEPSEEK") — 单词优先 GLM 等便宜模型。"""
+        lookup_word() 用 _cfg("LLM", "DEEPSEEK") — 单词优先配置的便宜模型。"""
     for g in groups:
         key = _env(f"{g}_API_KEY")
         if key:
@@ -128,7 +128,7 @@ def ask(question: str,
 _zh_summary_cache: dict[str, str] = {}
 
 def summarize_zh(title: str, body: str, model: str | None = None) -> str:
-    """GLM 生成一句话中文简介(卡片用)。失败返回空串,调用方回退到英文摘要。"""
+    """生成一句话中文简介(卡片用)。失败返回空串,调用方回退到英文摘要。"""
     ck = title
     if ck in _zh_summary_cache:
         return _zh_summary_cache[ck]
@@ -145,10 +145,12 @@ def summarize_zh(title: str, body: str, model: str | None = None) -> str:
             extra["extra_body"] = {"thinking": {"level": lvl}}
         client = _client(cfg)
         out = ""
-        for attempt in range(2):   # 首次失败/没输出中文时重试一次
+        for attempt in range(3):   # 失败/无中文输出时重试;最后一次仅用标题
+            use_prompt = prompt if attempt < 2 else (
+                '文章标题: ' + title + '\n用一句不超过 40 字的简体中文概括这篇文章讲什么。只输出这句话本身。')
             resp = client.chat.completions.create(
                 model=model or cfg["model"],
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": use_prompt}],
                 max_tokens=800, temperature=0.2, **extra)
             lines = (resp.choices[0].message.content or "").strip().splitlines()
             out = lines[0].strip() if lines else ""
@@ -171,7 +173,7 @@ def lookup_word(word: str,
                 sentence_context: str | None = None,
                 model: str | None = None) -> dict:
     """
-    单词速查:GLM 等便宜模型,只回短中文释义(取本句意)。
+    单词速查:配置的便宜模型,只回短中文释义(取本句意)。
     prompt/输出都极短,配合进程内缓存,token 消耗最小化。
     用于 /api/dict?word=x
     """
@@ -193,7 +195,7 @@ def lookup_word(word: str,
     )
     try:
         client = _client(cfg)
-        # 智谱 GLM 等思考型模型:可配 LLM_THINKING_LEVEL=low 控制思考档位省 token
+        # 思考型模型(如智谱 GLM):可配 LLM_THINKING_LEVEL=low 控制思考档位省 token
         extra = {}
         lvl = _env("LLM_THINKING_LEVEL")
         if lvl:

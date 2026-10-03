@@ -149,12 +149,27 @@ DEFAULT_RSS_SOURCES = [
 ]
 
 # 无 RSS 的免费源 — 走 HTML 爬取(RSS 已下线的 China Daily 等)
+# limit 是索引链接个数(首页链接有重复),不是篇数;真正入库还要过正文长度/同题去重
 DEFAULT_HTML_SOURCES = [
     {"name": "China Daily",
      "index_url": "https://www.chinadaily.com.cn/world",
      "link_sel": "a[href*='/a/2']",
      "base_url": "https://www.chinadaily.com.cn",
-     "limit": 8,
+     "limit": 16,
+     "title_sel": "h1",
+     "body_sel": "#Content"},
+    {"name": "China Daily (China)",
+     "index_url": "https://www.chinadaily.com.cn/china",
+     "link_sel": "a[href*='/a/2']",
+     "base_url": "https://www.chinadaily.com.cn",
+     "limit": 16,
+     "title_sel": "h1",
+     "body_sel": "#Content"},
+    {"name": "China Daily (Business)",
+     "index_url": "https://www.chinadaily.com.cn/business",
+     "link_sel": "a[href*='/a/2']",
+     "base_url": "https://www.chinadaily.com.cn",
+     "limit": 16,
      "title_sel": "h1",
      "body_sel": "#Content"},
 ]
@@ -427,7 +442,8 @@ def _filter_junk(records: list[dict]) -> list[dict]:
         clean = [p for p in paras
                  if not any(pat.search(p) for pat in _JUNK_PATTERNS)]
         cleaned = "\n\n".join(clean).strip()
-        if len(cleaned) < 400:
+        # 正文过短的一律丢弃(新闻简报摘要/导语,不构成可精读的文章)
+        if len(cleaned.split()) < 120:
             log.info("junk dropped: %s (%s)", r.get("title", "")[:50], r.get("source", ""))
             continue
         r["body"] = cleaned
@@ -455,8 +471,19 @@ def _dedupe_same_story(records: list[dict]) -> list[dict]:
     return [best[k] for k in order]
 
 
+_CAPTION_RE = re.compile(
+    r"(photo by|getty images|reuters|ap hide caption|hide caption|illustration by)", re.I)
+
+def _strip_caption_deck(articles: list[dict]) -> None:
+    """图片版权/图注类英文 deck 直接清空,避免作为简介显示。"""
+    for a in articles:
+        d = (a.get("deck") or "").strip()
+        if d and _CAPTION_RE.search(d):
+            a["deck"] = ""
+
+
 def _apply_zh_summaries(articles: list[dict]) -> None:
-    """卡片简介换成 GLM 中文总结(并发,失败回退英文摘要)。"""
+    """卡片简介换成 DeepSeek 中文总结(并发,失败回退英文摘要)。"""
     from concurrent.futures import ThreadPoolExecutor
     import deepseek_client
     if not deepseek_client.is_configured():
@@ -465,13 +492,38 @@ def _apply_zh_summaries(articles: list[dict]) -> None:
         try:
             zh = deepseek_client.summarize_zh(a.get("title", ""),
                                               a.get("body") or a.get("deck", ""))
-            if zh:
-                a["deck"] = zh
-        except Exception:
-            pass
+            a["deck"] = zh or ""   # 生成不出来就留空,不回退英文
+        except Exception as e:
+            log.warning("zh summary failed for %s: %s", a.get("title", "")[:40], e)
+            a["deck"] = ""
     with ThreadPoolExecutor(max_workers=8) as ex:
         list(ex.map(one, articles))
     log.info("zh summaries applied")
+
+
+def _interleave_by_source(records: list[dict]) -> list[dict]:
+    """按来源轮流穿插。截断到 max_articles 时,避免排在末尾的来源(如 HTML 源)被整体丢弃。"""
+    groups: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for r in records:
+        s = r.get("source") or ""
+        if s not in groups:
+            groups[s] = []
+            order.append(s)
+        groups[s].append(r)
+    out: list[dict] = []
+    round_idx = 0
+    while True:
+        added = False
+        for s in order:
+            g = groups[s]
+            if round_idx < len(g):
+                out.append(g[round_idx])
+                added = True
+        if not added:
+            break
+        round_idx += 1
+    return out
 
 
 def full_refresh(out_dir: Path,
@@ -485,12 +537,14 @@ def full_refresh(out_dir: Path,
     raw = collect(cfg)
     raw = _filter_junk(raw)
     raw = _dedupe_same_story(raw)
+    raw = _interleave_by_source(raw)
     raw = raw[:max_articles]
     log.info("Refresh collected %d articles", len(raw))
     if not raw:
         return {"ok": False, "reason": "no articles"}
 
     articles = [build_article(r) for r in raw]
+    _strip_caption_deck(articles)
     _apply_zh_summaries(articles)
     key = issue_key()
     week = week_label()
