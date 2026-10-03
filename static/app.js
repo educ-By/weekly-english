@@ -569,7 +569,7 @@
         if (!active || active.word !== word) return;
         if (res && res.zh) {
           drawCard(el, { word, phonetic: "", definition_en: "",
-                         translation: res.zh + "（浏览器翻译）",
+                         translation: res.zh,
                          examples: [], cefr_level: "" });
           return;
         }
@@ -697,7 +697,9 @@
       if (!was) return;                    // 只在一次真正拖选结束时动作,避免误触复发
       if (!activeSel) { clearSel(); return; }
       const raw = activeSel.toString().replace(/\s+/g, " ").trim();
-      if (!raw || raw.length > 80 || !/^[A-Za-z][A-Za-z'’.\-\s]*$/.test(raw)) {
+      // 只要含英文字母、且不含中日韩文字即可 —— 允许标点(逗号/斜杠/引号/括号等)
+      const cjk = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+      if (!raw || raw.length > 80 || cjk.test(raw) || !/[A-Za-z]/.test(raw)) {
         clearSel(); activeSel = null; return;
       }
       const sn = activeSel.startContainer;
@@ -724,7 +726,7 @@
       if (!active || active.word !== word) return;
       if (res && res.zh) {
         drawCard(active.anchor, { word, phonetic: "", definition_en: "",
-                                  translation: res.zh + "（浏览器翻译）", cefr_level: "" }, "", true);
+                                  translation: res.zh, cefr_level: "" }, "", true);
         return;
       }
       // 内置引擎不可用时退到在线词典(用户主动点击才烧 AI 额度)
@@ -1004,7 +1006,7 @@
       const articleId = popup.dataset.articleId;
       const issueKey = popup.dataset.issueKey;
       const definition = popup.dataset.definition || "";
-      // 浏览器翻译的显示标注不入库
+      // 兼容早期带"（浏览器翻译）"标注的数据(现在展示时不再加该标注)
       const translation = (popup.dataset.translation || "").replace("（浏览器翻译）", "");
       const sentence = popup.dataset.sentence || "";
       btn.disabled = true;
