@@ -179,69 +179,118 @@ _IRREGULAR = {
     "woke": "wake", "woken": "wake", "wakes": "wake", "waking": "wake",
 }
 
+# 常见不规则复数、序数、以及补漏的常见不规则动词(只收常见形)
+_IRREGULAR.update({
+    # 不规则复数
+    "women": "woman", "children": "child", "feet": "foot", "teeth": "tooth",
+    "geese": "goose", "mice": "mouse", "people": "person", "dice": "die",
+    "crises": "crisis", "analyses": "analysis", "hypotheses": "hypothesis",
+    "theses": "thesis", "diagnoses": "diagnosis", "phenomena": "phenomenon",
+    "criteria": "criterion", "bacteria": "bacterium", "fungi": "fungus",
+    "nuclei": "nucleus", "stimuli": "stimulus", "alumni": "alumnus",
+    "media": "medium", "data": "datum",
+    # 序数
+    "first": "one", "second": "two", "third": "three", "fourth": "four",
+    "fifth": "five", "sixth": "six", "seventh": "seven", "eighth": "eight",
+    "ninth": "nine", "tenth": "ten", "eleventh": "eleven", "twelfth": "twelve",
+    "twentieth": "twenty",
+    # 常见不规则动词补漏
+    "born": "bear", "borne": "bear", "bore": "bear", "sought": "seek",
+    "dug": "dig", "bred": "breed", "bled": "bleed", "fled": "flee",
+    "sped": "speed", "wove": "weave", "woven": "weave", "trod": "tread",
+    "clung": "cling", "flung": "fling", "stung": "sting",
+    "sprang": "spring", "sprung": "spring", "spun": "spin",
+    "sank": "sink", "sunk": "sink", "shrank": "shrink", "shrunk": "shrink",
+})
+
 # 缩写还原表 — 不规则缩写(不能靠简单去后缀得到原型)
 _CONTRACTION_BASE = {
     "won't": "will", "can't": "can", "cannot": "can",
     "shan't": "shall", "ain't": "be",
 }
 
-# 极简词形归一:不做语言学完备,只覆盖常见英语曲折
-# 让 "markets" / "rate" / "rates" / "running" / "loved" 都能命中白名单原型
-def _lemma(t: str) -> str:
-    if not t:
-        return t
-    # 先查不规则表
-    if t in _IRREGULAR:
-        return _IRREGULAR[t]
-    # 缩写 / 所有格还原:don't→do、won't→will、isn't→is、we're→we、I'm→I、world's→world
-    # 这些是小学级词,绝不能标成"超纲"
+# 词形归一 —— 返回词 t 的**常见原型候选**列表。
+# 调用方命中任意一个候选即视为"在白名单内",所以天然容忍多步归一变体
+# (father's → father、biggest → big、feet → foot、softly → soft)。
+# 只覆盖常见英语变体:复数/三单、过去式/过去分词、-ing、比较级/最高级、
+# 副词 -ly、所有格与缩写,外加常见不规则形;不做语言学完备。
+def _lemmas(t: str) -> list[str]:
+    out: list[str] = []
+
+    def add(x: str) -> None:
+        if x and len(x) >= 2 and x not in out:
+            out.append(x)
+
+    def add_irregular(x: str) -> None:
+        add(x)
+        if x in _IRREGULAR:
+            add(_IRREGULAR[x])
+
+    add_irregular(t)
+
+    # 缩写 / 所有格:don't→do、won't→will、isn't→is、we're→we、I'm→I、world's→world
+    base = t
     if t in _CONTRACTION_BASE:
-        t = _CONTRACTION_BASE[t]
+        base = _CONTRACTION_BASE[t]
     elif t.endswith("n't"):
-        t = t[:-3]
+        base = t[:-3]
     elif t.endswith(("'re", "'ve", "'ll")):
-        t = t[:-3]
+        base = t[:-3]
     elif t.endswith(("'m", "'d")):
-        t = t[:-2]
-    elif t.endswith("'s") or t.endswith("s'"):
-        t = t[:-2]
-    # 还原成原型后可能命中不规则表(did→do / was→be)
-    if t in _IRREGULAR:
-        return _IRREGULAR[t]
-    # -ies → -y
-    if t.endswith("ies") and len(t) > 4:
-        return t[:-3] + "y"
-    # -sses / -shes / -ches / -xes / -zes  → 去 es
-    if t.endswith(("sses", "shes", "ches", "xes", "zes")):
-        return t[:-2]
-    # -ied → -y
-    if t.endswith("ied"):
-        return t[:-3] + "y"
-    # -ses / -ges / -ces / -zes  → 去 s
-    if t.endswith(("ses", "ges", "ces")) and len(t) > 4:
-        return t[:-1]
-    # -s (复数 / 三单)
-    if t.endswith("s") and not t.endswith(("ss", "us", "is", "os")) and len(t) > 4:
-        return t[:-1]
-    # -ed (过去式 / 过去分词)
-    if t.endswith("ed") and len(t) > 4:
-        if len(t) > 4 and t[-3] == t[-4]:
-            return t[:-3]
-        return t[:-2]
-    # -ing
-    if t.endswith("ing") and len(t) > 5:
-        if len(t) > 5 and t[-4] == t[-5]:
-            return t[:-4]
-        return t[:-3]
-    # 形容词比较级 -er / -est (排除 -er 结尾的实词:teacher, officer)
-    if t.endswith("er") and len(t) > 5:
         base = t[:-2]
-        # 如果基础形是个白名单词,可能是比较级 — 我们直接返回 base,
-        # 让上层查 base 即可。空白名单没有也不算错(本来就是超纲)。
-        return base
-    if t.endswith("est") and len(t) > 5:
-        return t[:-3]
-    return t
+    elif t.endswith("'s") or t.endswith("s'"):
+        base = t[:-2]
+    add_irregular(base)
+
+    s = base
+    # 复数 / 三单
+    if s.endswith("ies") and len(s) > 4:
+        add_irregular(s[:-3] + "y")
+    if s.endswith(("sses", "shes", "ches", "xes", "zes")):
+        add_irregular(s[:-2])
+    if s.endswith(("ses", "ges", "ces")) and len(s) > 4:
+        add_irregular(s[:-1])
+    if s.endswith("s") and not s.endswith(("ss", "us", "is", "os")) and len(s) > 3:
+        add_irregular(s[:-1])
+    # 过去式 / 过去分词
+    if s.endswith("ied"):
+        add_irregular(s[:-3] + "y")
+    if s.endswith("ed") and len(s) > 3:
+        add_irregular(s[:-2])
+        add_irregular(s[:-1])
+        if s[-3] == s[-4] and s[-3] not in "aeiou":
+            add_irregular(s[:-3])
+    # -ing(双写只对辅音:stopping→stop,freeing→free 不要误剥成 fre)
+    if s.endswith("ing") and len(s) > 4:
+        add_irregular(s[:-3])
+        add_irregular(s[:-3] + "e")
+        if len(s) > 5 and s[-4] == s[-5] and s[-4] not in "aeiou":
+            add_irregular(s[:-4])
+    # 比较级 / 最高级(含双写:biggest→big、hotter→hot)
+    if s.endswith("est") and len(s) > 4:
+        add_irregular(s[:-3])
+        add_irregular(s[:-2])
+        if s[-4] == s[-5] and s[-4] not in "aeiou":
+            add_irregular(s[:-4])
+    if s.endswith("er") and len(s) > 3:
+        add_irregular(s[:-2])
+        add_irregular(s[:-1])
+        if s[-3] == s[-4] and s[-3] not in "aeiou":
+            add_irregular(s[:-3])
+    # 副词 -ly(fully←full、truly←true、really←real)
+    if s.endswith("ly") and len(s) > 4:
+        add_irregular(s[:-2])
+        add_irregular(s[:-1])
+        add_irregular(s[:-2] + "e")
+    return out
+
+
+# 智能引号 → ASCII,避免 "doesn’t"/"world’s" 被切成 "doesn"/"world"
+_QUOTE_MAP = {ord(c): "'" for c in ("\u2018", "\u2019", "\u02bc", "\u00b4", "`")}
+
+
+def _normalize_quotes(s: str) -> str:
+    return s.translate(_QUOTE_MAP)
 
 # 专有名词启发式 — 首字母大写不标(人名、地名、机构)
 def _is_proper(token: str) -> bool:
@@ -337,6 +386,7 @@ def find_out_of_scope_words(text: str,
     这些就是"超纲词",前端会标红。
     """
     vocab = set(whitelist) if whitelist is not None else WHITELIST
+    text = _normalize_quotes(text)
     counts: dict[str, int] = {}
     for m in _WORD_RE.findall(text):
         t = m.lower()
@@ -349,12 +399,15 @@ def find_out_of_scope_words(text: str,
         # 原型在白名单 → 不标
         if t in vocab:
             continue
-        # 词形归一后命中
-        if _lemma(t) in vocab:
+        # 任一常见变体原型命中白名单 → 不标
+        if any(c in vocab for c in _lemmas(t)):
             continue
-        # -ly 派生(exactly/quietly):基础形容词在白名单里就放行
-        if t.endswith("ly") and len(t) > 4 and t[:-2] in vocab:
-            continue
+        # 连字符复合词:各段都在白名单内 → 不标(year-old、high-speed、wake-up)
+        if "-" in t:
+            parts = [p for p in t.split("-") if p]
+            if parts and all(p in vocab or any(c in vocab for c in _lemmas(p))
+                             for p in parts):
+                continue
         counts[t] = counts.get(t, 0) + 1
 
     items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
