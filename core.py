@@ -100,9 +100,6 @@ DEFAULT_RSS_SOURCES = [
     {"name": "Nature News",
      "feed": "https://www.nature.com/nature.rss",
      "limit": 3, "full_text": True},
-    {"name": "New Scientist",
-     "feed": "https://www.newscientist.com/feed/home",
-     "limit": 2, "full_text": True},
     {"name": "ScienceDaily",
      "feed": "https://www.sciencedaily.com/rss/all.xml",
      "limit": 2, "full_text": True},
@@ -117,9 +114,6 @@ DEFAULT_RSS_SOURCES = [
      "limit": 2, "full_text": True},
     {"name": "TechCrunch",
      "feed": "https://techcrunch.com/feed/",
-     "limit": 2, "full_text": True},
-    {"name": "Engadget",
-     "feed": "https://www.engadget.com/rss.xml",
      "limit": 2, "full_text": True},
     {"name": "Nautilus",
      "feed": "https://nautil.us/feed/",
@@ -137,9 +131,6 @@ DEFAULT_RSS_SOURCES = [
      "limit": 2, "full_text": True},
 
     # ---- B1 入门级(专为英语学习者写的分级新闻) ----
-    {"name": "News in Levels",
-     "feed": "https://newsinlevels.com/feed/",
-     "limit": 4, "full_text": True},
     {"name": "Breaking News English",
      "feed": "https://breakingnewsenglish.com/rss.xml",
      "limit": 4, "full_text": True},
@@ -418,16 +409,6 @@ def write_index_landing(out_dir: Path, issues: list[dict]) -> None:
 
 
 _JUNK_PATTERNS = [
-    # News in Levels 全站推广/使用说明样板段 — 不是正文
-    re.compile(r"do you want to learn english", re.I),
-    re.compile(r"we have a special book for you", re.I),
-    re.compile(r"news in levels is designed", re.I),
-    re.compile(r"do the test at", re.I),
-    re.compile(r"go to your level", re.I),
-    re.compile(r"read two news articles", re.I),
-    re.compile(r"watch the original video", re.I),
-    re.compile(r"listen to the news from today", re.I),
-    re.compile(r"follow the instructions below", re.I),
     # 嵌入播放器残留
     re.compile(r"embed embed\b", re.I),
     re.compile(r"<iframe", re.I),
@@ -452,7 +433,7 @@ def _filter_junk(records: list[dict]) -> list[dict]:
 
 
 def _dedupe_same_story(records: list[dict]) -> list[dict]:
-    """同一故事的分级重复(如 News in Levels level 1/2/3)只留正文最长的一篇。"""
+    """同一故事的分级重复(如同一来源的 level 1/2/3 变体)只留正文最长的一篇。"""
     import hashlib
     best: dict[str, dict] = {}
     order: list[str] = []

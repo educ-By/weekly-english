@@ -181,13 +181,13 @@ curl "http://localhost:8000/api/dict?word=flattened&sentence=The+Phillips+curve+
 
 ---
 
-## 数据来源(默认 23 个 RSS,并发抓取)
+## 数据来源(默认 33 个 RSS,并发抓取)
 
 **新闻类(国内直连可达):** NPR News / NPR Education / NPR Science / CBS News /
 CNBC / Sky News / France 24 / Global Times
 
-**科学/科技:** MIT Technology Review / Nature News / New Scientist / ScienceDaily /
-Phys.org / Ars Technica / TechCrunch / Engadget / Nautilus / Scientific American*
+**科学/科技:** MIT Technology Review / Nature News / ScienceDaily /
+Phys.org / Ars Technica / TechCrunch / Nautilus / Scientific American*
 
 **文化/长文:** Smithsonian Magazine / Aeon / The Economist* / The Guardian* /
 BBC Learning English*
@@ -198,7 +198,8 @@ BBC Learning English*
 
 **The Guardian 双通道**:RSS 被墙,但官方 API(content.guardianapis.com)国内直连
 可达 — 在 `.env` / 环境变量里配置 `GUARDIAN_API_KEY`(`open-platform.theguardian.com`
-免费注册)即自动启用,返回官方全文。
+免费注册)即自动启用,返回官方全文。默认抓 `world`、`technology` 两个版块、每版块 2 篇
+(`core.DEFAULT_GUARDIAN_SECTIONS`);未配置 key 则静默跳过,不影响其他源。
 
 **代理**:requests 原生读取 `HTTPS_PROXY` 环境变量 — 本地挂代理后启动服务,
 被墙的源(Economist/BBC/SciAm 等)会自动恢复抓取。

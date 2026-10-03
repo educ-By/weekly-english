@@ -179,6 +179,12 @@ _IRREGULAR = {
     "woke": "wake", "woken": "wake", "wakes": "wake", "waking": "wake",
 }
 
+# 缩写还原表 — 不规则缩写(不能靠简单去后缀得到原型)
+_CONTRACTION_BASE = {
+    "won't": "will", "can't": "can", "cannot": "can",
+    "shan't": "shall", "ain't": "be",
+}
+
 # 极简词形归一:不做语言学完备,只覆盖常见英语曲折
 # 让 "markets" / "rate" / "rates" / "running" / "loved" 都能命中白名单原型
 def _lemma(t: str) -> str:
@@ -187,9 +193,21 @@ def _lemma(t: str) -> str:
     # 先查不规则表
     if t in _IRREGULAR:
         return _IRREGULAR[t]
-    # 所有格 world's / students' → 原词
-    if t.endswith("'s") or t.endswith("s'"):
-        return t[:-2]
+    # 缩写 / 所有格还原:don't→do、won't→will、isn't→is、we're→we、I'm→I、world's→world
+    # 这些是小学级词,绝不能标成"超纲"
+    if t in _CONTRACTION_BASE:
+        t = _CONTRACTION_BASE[t]
+    elif t.endswith("n't"):
+        t = t[:-3]
+    elif t.endswith(("'re", "'ve", "'ll")):
+        t = t[:-3]
+    elif t.endswith(("'m", "'d")):
+        t = t[:-2]
+    elif t.endswith("'s") or t.endswith("s'"):
+        t = t[:-2]
+    # 还原成原型后可能命中不规则表(did→do / was→be)
+    if t in _IRREGULAR:
+        return _IRREGULAR[t]
     # -ies → -y
     if t.endswith("ies") and len(t) > 4:
         return t[:-3] + "y"
