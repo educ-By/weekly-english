@@ -4,30 +4,32 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>{{ article.title }} · Weekly English</title>
-<link rel="stylesheet" href="static/style.css?v=25" />
+<link rel="stylesheet" href="/static/style.css?v=26" />
 </head>
-<body data-page="article">
+<body data-page="article" data-issue-key="{{ issue.key }}">
 
-<header class="masthead">
-  <div class="wrap">
-    <a class="brand" href="index.html">
-      <span class="logo-mark">W·E</span>
-      <span class="logo-text">Weekly English</span>
-    </a>
-    <nav class="meta">
-      <a class="nav-link" href="index.html">← {{ issue.week_label }}</a>
-      <span class="dot"></span>
-      <a class="nav-link" id="account-link" href="/auth/login">Sign in</a>
-    </nav>
-  </div>
-</header>
+{% include "_masthead.html.j2" %}
 
 <main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <a href="/archive">Archive</a>
+    <span class="crumb-sep">›</span>
+    <a href="/issue/{{ issue.key }}">{{ issue.week_label }}</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">{{ article.title }}</span>
+  </nav>
 
   <article class="entry" id="article-{{ article.id }}" data-level="{{ article.level }}">
     <div class="entry-head">
       <div class="entry-meta">
+        {% if article.url %}
+        <a class="src" href="{{ article.url | e }}" target="_blank" rel="noopener noreferrer">{{ article.source }}</a>
+        {% else %}
         <span class="src">{{ article.source }}</span>
+        {% endif %}
         <span class="chip chip-{{ article.level|lower }}">{{ article.level }} · {{ article.level_label }}</span>
         <time>{{ article.published_display }}</time>
       </div>
@@ -95,17 +97,45 @@
     <div class="ask-mount"></div>
   </article>
 
-  <p class="back-link"><a href="index.html">← Back to {{ issue.week_label }}</a></p>
+  {% if prev_article or next_article %}
+  <nav class="pager" aria-label="More in this issue">
+    {% if prev_article %}
+    <a class="pager-item pager-prev" href="/issue/{{ issue.key }}/article-{{ prev_article.id }}.html">
+      <span class="pager-label">← Previous</span>
+      <span class="pager-title">{{ prev_article.title }}</span>
+    </a>
+    {% else %}<span class="pager-item pager-empty"></span>{% endif %}
+    {% if next_article %}
+    <a class="pager-item pager-next" href="/issue/{{ issue.key }}/article-{{ next_article.id }}.html">
+      <span class="pager-label">Next →</span>
+      <span class="pager-title">{{ next_article.title }}</span>
+    </a>
+    {% else %}<span class="pager-item pager-empty"></span>{% endif %}
+  </nav>
+  {% endif %}
+
+  {% if related %}
+  <section class="related">
+    <h2 class="related-h2">Related reading</h2>
+    <p class="related-help">More from this issue — ranked by shared out-of-scope vocabulary, then by level.</p>
+    <div class="related-list">
+      {% for r in related %}
+      <a class="related-item" href="/issue/{{ issue.key }}/article-{{ r.id }}.html">
+        <span class="chip chip-{{ r.level|lower }}">{{ r.level }}</span>
+        <span class="related-title">{{ r.title }}</span>
+        <span class="related-shared">{{ r.shared }} shared word{{ '' if r.shared == 1 else 's' }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <p class="back-link"><a href="/issue/{{ issue.key }}">← Back to {{ issue.week_label }}</a></p>
 
 </main>
 
-<footer class="foot">
-  <div class="wrap">
-    <span>Weekly English · {{ issue.week_label }}</span>
-    <span>Originals preserved verbatim.</span>
-  </div>
-</footer>
+{% include "_footer.html.j2" %}
 
-<script src="static/app.js?v=25"></script>
+<script src="/static/app.js?v=26"></script>
 </body>
 </html>

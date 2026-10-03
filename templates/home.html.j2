@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Weekly English · Hand-picked reading, graded B1–C1</title>
+<link rel="stylesheet" href="/static/style.css?v=26" />
+</head>
+<body data-page="home">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="hero-kicker">{% if issue %}This week · {{ issue.week_label }}{% else %}Weekly English{% endif %}</div>
+    <h1 class="hero-title">{% if issue %}{{ issue.title }}{% else %}A weekly set of reading, graded for learners.{% endif %}</h1>
+    <p class="hero-deck">
+      Every week we collect a set of English pieces, grade each one B1 / B2 / C1,
+      and mark the words that fall outside the high-school and CET-4/6 word lists.
+    </p>
+    {% if issue %}
+    <div class="hero-meta">
+      <span>{{ total }} pieces</span>
+      <span class="dot"></span>
+      <span>{{ counts.B1 }} B1 · {{ counts.B2 }} B2 · {{ counts.C1 }} C1</span>
+    </div>
+    <div class="hero-actions">
+      <a class="btn btn-solid" href="/issue/{{ issue.key }}">Read this issue</a>
+      <a class="btn" href="/archive">Browse the archive</a>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if featured %}
+  <section class="home-block">
+    <div class="home-block-head">
+      <h2 class="home-h2">Featured this week</h2>
+      <a class="home-more" href="/issue/{{ issue.key }}">All {{ total }} pieces →</a>
+    </div>
+    <div class="cards">
+      {% for art in featured %}
+      <a class="card card-{{ art.level|lower }}" href="/issue/{{ issue.key }}/article-{{ art.id }}.html">
+        <div class="card-head">
+          <span class="src">{{ art.source }}</span>
+          <span class="chip chip-{{ art.level|lower }}">{{ art.level }}</span>
+        </div>
+        <h3 class="card-title">{{ art.title }}</h3>
+        <p class="card-deck">{{ art.deck }}</p>
+        <div class="card-foot">
+          {% if art.words %}<span>{{ art.words }} words</span><span class="dot"></span>{% endif %}
+          <span>{{ art.level_label }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if level_totals %}
+  <section class="home-block">
+    <h2 class="home-h2">Start at your level</h2>
+    <div class="level-cards">
+      {% for lv, label, blurb in [("B1", "Starter", "Short sentences, common vocabulary."),
+                                  ("B2", "Intermediate", "Longer pieces, wider vocabulary."),
+                                  ("C1", "Advanced", "Dense prose, demanding vocabulary.")] %}
+      <a class="level-card lv-{{ lv|lower }}" href="/level/{{ lv }}">
+        <span class="chip chip-{{ lv|lower }}">{{ lv }}</span>
+        <span class="level-card-name">{{ label }}</span>
+        <span class="level-card-blurb">{{ blurb }}</span>
+        <span class="level-card-count">{{ level_totals.get(lv, 0) }} pieces across all issues</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if recent %}
+  <section class="home-block">
+    <div class="home-block-head">
+      <h2 class="home-h2">Recent issues</h2>
+      <a class="home-more" href="/archive">Full archive →</a>
+    </div>
+    <div class="archive-list">
+      {% for it in recent %}
+      <a class="archive-row" href="/issue/{{ it.key }}">
+        <span class="archive-no">No. {{ it.number }}</span>
+        <span class="archive-week">{{ it.week_label }}</span>
+        <span class="archive-title">{{ it.title }}</span>
+        <span class="archive-count">{{ it.count }} pieces</span>
+        <span class="archive-arrow">→</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="/static/app.js?v=26"></script>
+</body>
+</html>

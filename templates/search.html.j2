@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{% if q %}Search · {{ q }}{% else %}Search{% endif %} · Weekly English</title>
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="/static/style.css?v=26" />
+</head>
+<body data-page="search">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">Search</span>
+  </nav>
+
+  <section class="cover cover-compact">
+    <div class="cover-kicker">Search</div>
+    <h1 class="cover-title">
+      {% if q %}“{{ q }}”{% else %}Search the archive{% endif %}
+    </h1>
+    <div class="cover-meta">
+      {% if q %}
+      <span>{{ total }} match{{ '' if total == 1 else 'es' }} across all issues</span>
+      {% else %}
+      <span>Search every article collected so far</span>
+      {% endif %}
+    </div>
+  </section>
+
+  <form class="search-page-form" action="/search" method="get" role="search">
+    <label class="search">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <input type="search" name="q" value="{{ q }}" placeholder="Search titles and article text…"
+             autocomplete="off" autofocus />
+    </label>
+    <button class="btn btn-solid" type="submit">Search</button>
+  </form>
+
+  {% if results %}
+  <section class="result-list">
+    {% for r in results %}
+    <a class="result-row" href="/issue/{{ r.issue_key }}/article-{{ r.id }}.html">
+      <span class="result-meta">
+        <span class="chip chip-{{ r.level|lower }}">{{ r.level }}</span>
+        <span class="result-issue">{{ r.week_label }}</span>
+      </span>
+      <span class="result-title">{{ r.title }}</span>
+      <span class="result-deck">{{ r.deck }}</span>
+    </a>
+    {% endfor %}
+  </section>
+  {% elif q %}
+  <p class="empty">No articles match “{{ q }}”. Try a shorter or more general word.</p>
+  {% endif %}
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="/static/app.js?v=26"></script>
+</body>
+</html>

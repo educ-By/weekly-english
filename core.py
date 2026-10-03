@@ -8,10 +8,13 @@ core — 后端 / 脚本共用的业务逻辑入口
 """
 from __future__ import annotations
 import datetime as dt
+import json
 import logging
 import os
 import re
 import shutil
+from collections import Counter
+from html import unescape as unescape_html
 from pathlib import Path
 
 import jinja2
@@ -312,13 +315,61 @@ _env = jinja2.Environment(
 )
 
 
+def article_meta(a: dict) -> dict:
+    """catalog / meta.json 里的单篇摘要 —— 只保留跨期页面需要的字段。"""
+    return {
+        "id": a["id"],
+        "title": a["title"],
+        "level": a["level"],
+        "level_label": a.get("level_label", ""),
+        "words": a.get("stats", {}).get("total_words", 0),
+        "deck": a.get("deck", ""),
+        "url": a.get("url", ""),
+        "source": a.get("source", ""),
+        "search": a.get("body_search", ""),
+    }
+
+
+def vocab_summary(articles: list[dict], limit: int = 28) -> list[dict]:
+    """本期超纲词汇总:按"出现在几篇里"降序,再按总出现次数降序。"""
+    docs: Counter = Counter()
+    total: Counter = Counter()
+    for a in articles:
+        words = set(a.get("rare_words") or [])
+        body = (a.get("body_search") or "").lower()
+        for w in words:
+            docs[w] += 1
+            total[w] += body.count(w)
+    ranked = sorted(total, key=lambda w: (-docs[w], -total[w], w))
+    return [{"word": w, "count": docs[w]} for w in ranked[:limit]]
+
+
+def related_for(article: dict, articles: list[dict], limit: int = 4) -> list[dict]:
+    """同期内挑相关阅读:同难度优先,其次按共享超纲词数量。"""
+    mine = set(article.get("rare_words") or [])
+    scored = []
+    for other in articles:
+        if other["id"] == article["id"]:
+            continue
+        shared = len(mine & set(other.get("rare_words") or []))
+        other_level = 0 if other["level"] == article["level"] else 1
+        scored.append((other_level, -shared, other["id"], other))
+    scored.sort(key=lambda t: (t[0], t[1], t[2]))
+    return [
+        {"id": o["id"], "title": o["title"], "level": o["level"], "shared": -neg}
+        for _, neg, _, o in scored[:limit]
+    ]
+
+
 def render_issue_to_dir(articles: list[dict],
                         out_dir: Path,
                         week: str,
                         title: str,
-                        number: int) -> Path:
-    """渲染一期到指定目录:index.html + article-<id>.html + static/"""
+                        number: int,
+                        key: str | None = None) -> Path:
+    """渲染一期到指定目录:index.html + article-<id>.html + meta.json + static/"""
     out_dir.mkdir(parents=True, exist_ok=True)
+    key = key or out_dir.name
 
     static_dest = out_dir / "static"
     if static_dest.exists():
@@ -328,21 +379,42 @@ def render_issue_to_dir(articles: list[dict],
     sources = sorted({a["source"] for a in articles})
     counts = {"B1": 0, "B2": 0, "C1": 0}
     for a in articles:
-        counts[a["level"]] += 1
+        counts[a["level"]] = counts.get(a["level"], 0) + 1
     issue_ctx = {
-        "issue": {"week_label": week, "title": title, "number": number},
+        "issue": {"key": key, "week_label": week, "title": title, "number": number},
         "articles": articles,
         "sources": sources,
         "counts": counts,
+        "nav": "issue",
     }
 
-    issue_html = _env.get_template("issue.html.j2").render(page="index", **issue_ctx)
+    issue_html = _env.get_template("issue.html.j2").render(
+        page="index", vocab_summary=vocab_summary(articles), **issue_ctx)
     (out_dir / "index.html").write_text(issue_html, encoding="utf-8")
 
     art_tpl = _env.get_template("article.html.j2")
-    for a in articles:
-        art_html = art_tpl.render(page="article", article=a, **issue_ctx)
+    for idx, a in enumerate(articles):
+        art_html = art_tpl.render(
+            page="article",
+            article=a,
+            prev_article=articles[idx - 1] if idx > 0 else None,
+            next_article=articles[idx + 1] if idx + 1 < len(articles) else None,
+            related=related_for(a, articles),
+            **issue_ctx,
+        )
         (out_dir / f"article-{a['id']}.html").write_text(art_html, encoding="utf-8")
+
+    # 机器可读索引 —— 供 /level、/search 与首页复用,不必再抓 HTML
+    meta = {
+        "key": key,
+        "week_label": week,
+        "title": title,
+        "number": number,
+        "count": len(articles),
+        "articles": [article_meta(a) for a in articles],
+    }
+    (out_dir / "meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 
     log.info("Rendered issue: %s (%d articles)", out_dir, len(articles))
     return out_dir
@@ -372,6 +444,8 @@ def scan_issues(out_dir: Path) -> list[dict]:
         issues.append({
             "key": p.name,
             "path": f"{p.name}/index.html",
+            "year": iso[0] if iso else "",
+            "week": f"W{iso[1]}" if len(iso) == 2 else "",
             "week_label": f"{iso[0]} · W{iso[1]}",
             "title": title,
             "count": articles_count,
@@ -381,29 +455,281 @@ def scan_issues(out_dir: Path) -> list[dict]:
     return issues
 
 
+# 旧版(没有 meta.json 的期)回抓用的卡片解析。
+# 卡片从 <a class="card card-b2"> 开始,到下一张卡片为止;字段逐个单独提取,
+# 因为改造前的模板没有开转义,属性值里可能夹着 <i> 这类标签或裸引号。
+_CARD_OPEN_RE = re.compile(r'<a class="card card-(?P<level>[a-z0-9]+)"', re.S)
+_ID_RE = re.compile(r'href="article-([A-Za-z0-9_-]+)\.html"')
+
+
+def _first_group(pattern: str, text: str) -> str:
+    m = re.search(pattern, text, re.S)
+    return m.group(1) if m else ""
+
+
+def _strip_tags(text: str) -> str:
+    return re.sub(r"<[^>]*>", "", text or "")
+
+
+def _scrape_issue_articles(index_html: str) -> list[dict]:
+    """从旧版渲染的 index.html 抓回文章清单(用于没有 meta.json 的历史期)。"""
+    out: list[dict] = []
+    marks = list(_CARD_OPEN_RE.finditer(index_html))
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(index_html)
+        chunk = index_html[m.start():end]
+        idm = _ID_RE.search(chunk)
+        if not idm:
+            continue
+        level = (m.group("level") or "").upper()
+        title = _strip_tags(_first_group(
+            r'<h3 class="card-title">(.*?)</h3>', chunk))
+        deck = _strip_tags(_first_group(
+            r'<p class="card-deck">(.*?)</p>', chunk))
+        words = _first_group(
+            r'<div class="card-foot">\s*<span>(\d+) words</span>', chunk)
+        out.append({
+            "id": idm.group(1),
+            "title": unescape_html(title).strip(),
+            "level": level,
+            "level_label": LEVEL_LABEL.get(level, ""),
+            "words": int(words or 0),
+            "deck": unescape_html(deck).strip(),
+            "url": "",
+            "source": unescape_html(_first_group(r'data-source="([^"]*)"', chunk)),
+            "search": unescape_html(_first_group(r'data-body="([^"]*)"', chunk)),
+        })
+    return out
+
+
+_STATS_RE = re.compile(
+    r"([\d,]+)\s*words\s*·\s*avg\s*([\d.]+)\s*words/sentence\s*·\s*"
+    r"([\d,]+)\s*sentences\s*·\s*([\d.]+)%\s*B2 coverage",
+    re.S,
+)
+
+
+def _parse_legacy_article(html: str, card: dict) -> dict | None:
+    """从改造前生成的精读页还原一篇文章的渲染数据。
+
+    旧期没有原始抓取结果,也没有存原始出处 URL(旧模板没渲染),所以 url 只能是空字符 ——
+    精读页会把来源退化成纯文本而不是外链。
+    """
+    title = _strip_tags(_first_group(r"<h1>(.*?)</h1>", html)).strip()
+    if not title:
+        return None
+
+    stats_m = _STATS_RE.search(html)
+    if stats_m:
+        words = int(stats_m.group(1).replace(",", ""))
+        avg_sent = float(stats_m.group(2))
+        sentences = int(stats_m.group(3).replace(",", ""))
+        coverage = float(stats_m.group(4)) / 100.0
+    else:
+        words, avg_sent, sentences, coverage = card.get("words", 0), 0.0, 0, 0.0
+
+    body_block = _first_group(r'<div class="entry-body"[^>]*>(.*?)</div>', html)
+    body_paragraphs = [unescape_html(_strip_tags(p)).strip()
+                       for p in re.findall(r"<p>(.*?)</p>", body_block, re.S)]
+    body_paragraphs = [p for p in body_paragraphs if p]
+
+    summary_block = _first_group(r'<div class="entry-summary">(.*?)</div>', html)
+    summary_text = unescape_html(_strip_tags(
+        summary_block.replace("<strong>Excerpt.</strong>", ""))).strip()
+
+    level = (card.get("level") or "B2").upper()
+    return {
+        "id": card["id"],
+        "source": card.get("source", ""),
+        "url": "",
+        "title": unescape_html(title),
+        "published": "",
+        "published_display": _strip_tags(
+            _first_group(r"<time>(.*?)</time>", html)).strip() or "—",
+        "level": level,
+        "level_label": LEVEL_LABEL.get(level, ""),
+        "stats": {
+            "total_words": words,
+            "avg_sent_len": avg_sent,
+            "sentences": sentences,
+            "coverage_b2": coverage,
+        },
+        "rare_words": [unescape_html(w) for w in
+                       re.findall(r'class="vocab-word[^"]*"\s+data-word="([^"]*)"', html)],
+        "deck": card.get("deck", ""),
+        "summary_paragraphs": [summary_text] if summary_text else [],
+        "body_paragraphs": body_paragraphs,
+        "body_search": re.sub(r"<[^>]+>", " ", "\n\n".join(body_paragraphs)).lower(),
+    }
+
+
+def rebuild_legacy_issues(out_dir: Path) -> int:
+    """把改造前生成的期(没有 meta.json)就地重渲染成新模板。
+
+    幂等:重渲染后该期就有了 meta.json,后续启动不再触碰。
+    只有还原出的文章数达到卡片数的 80% 才落盘,避免把好页面换成残缺版本。
+    """
+    if not out_dir.exists():
+        return 0
+    rebuilt = 0
+    for it in scan_issues(out_dir):
+        key = it["key"]
+        issue_dir = out_dir / key
+        if (issue_dir / "meta.json").exists():
+            continue
+
+        idx = issue_dir / "index.html"
+        if not idx.exists():
+            continue
+        cards = _scrape_issue_articles(idx.read_text(encoding="utf-8"))
+        if not cards:
+            continue
+
+        articles: list[dict] = []
+        for card in cards:
+            page = issue_dir / f"article-{card['id']}.html"
+            if not page.exists():
+                continue
+            try:
+                parsed = _parse_legacy_article(page.read_text(encoding="utf-8"), card)
+            except Exception as e:
+                log.warning("Legacy parse failed for %s/%s: %s", key, card["id"], e)
+                continue
+            if parsed:
+                articles.append(parsed)
+
+        if len(articles) < max(1, int(len(cards) * 0.8)):
+            log.warning("Legacy rebuild skipped for %s (%d/%d articles recovered)",
+                        key, len(articles), len(cards))
+            continue
+
+        render_issue_to_dir(articles, issue_dir, it["week_label"], it["title"],
+                            it["number"], key=key)
+        rebuilt += 1
+        log.info("Rebuilt legacy issue %s with the new templates (%d articles)",
+                 key, len(articles))
+    return rebuilt
+
+
+def build_catalog(out_dir: Path) -> list[dict]:
+    """汇总全部期的机器可读索引并写 catalog.json。
+
+    优先读每期的 meta.json;对现网已有的、早于本次改造的历史期回退抓 index.html。
+    不触发任何网络请求。
+    """
+    catalog: list[dict] = []
+    for it in scan_issues(out_dir):
+        key = it["key"]
+        articles: list[dict] = []
+        meta_path = out_dir / key / "meta.json"
+        if meta_path.exists():
+            try:
+                articles = (json.loads(meta_path.read_text(encoding="utf-8"))
+                            .get("articles") or [])
+            except Exception as e:
+                log.warning("Bad meta.json for %s: %s", key, e)
+        if not articles:
+            idx = out_dir / key / "index.html"
+            if idx.exists():
+                try:
+                    articles = _scrape_issue_articles(idx.read_text(encoding="utf-8"))
+                except Exception as e:
+                    log.warning("Scrape failed for %s: %s", key, e)
+        if not articles:
+            log.warning("No article index for %s — skipped in catalog", key)
+            continue
+        catalog.append({
+            "key": key,
+            "week_label": it["week_label"],
+            "year": it.get("year", ""),
+            "title": it["title"],
+            "number": it["number"],
+            "count": len(articles),
+            "articles": articles,
+        })
+    try:
+        (out_dir / "catalog.json").write_text(
+            json.dumps({"issues": catalog}, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        log.warning("catalog.json write failed: %s", e)
+    return catalog
+
+
+def load_catalog(out_dir: Path) -> list[dict]:
+    """读 catalog.json 缓存;缺失或为空时重建一次。"""
+    path = out_dir / "catalog.json"
+    if path.exists():
+        try:
+            issues = (json.loads(path.read_text(encoding="utf-8"))
+                      .get("issues") or [])
+            if issues:
+                return issues
+        except Exception:
+            pass
+    return build_catalog(out_dir)
+
+
+def _issue_counts(issue: dict | None) -> dict[str, int]:
+    counts = {"B1": 0, "B2": 0, "C1": 0}
+    for a in (issue or {}).get("articles") or []:
+        lv = (a.get("level") or "").upper()
+        if lv in counts:
+            counts[lv] += 1
+    return counts
+
+
+def featured_articles(issue: dict | None, per_level: int = 1) -> list[dict]:
+    """首页「本期精选」:每层取前 N 篇。"""
+    out: list[dict] = []
+    for lv in ("B1", "B2", "C1"):
+        out.extend([a for a in (issue or {}).get("articles") or []
+                    if (a.get("level") or "").upper() == lv][:per_level])
+    return out
+
+
 def write_index_landing(out_dir: Path, issues: list[dict]) -> None:
-    """把根 index.html 设为最新一期,archive.html 列出全部。"""
+    """渲染首页门户 + archive 列表,并刷新跨期 catalog。
+
+    首页不再是"最新一期的副本":它有自己的 hero、精选、难度入口与往期入口。
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     static_dest = out_dir / "static"
     if static_dest.exists():
         shutil.rmtree(static_dest)
     shutil.copytree(STATIC_DIR, static_dest)
 
-    if issues:
-        latest = issues[0]
-        latest_path = out_dir / latest["path"]
-        target = out_dir / "index.html"
-        shutil.copyfile(latest_path, target)
-        html = target.read_text(encoding="utf-8")
-        html = html.replace(
-            'href="article-', 'href="' + latest["key"] + '/article-'
-        ).replace(
-            'href="index.html"', 'href="' + latest["key"] + '/index.html"'
-        )
-        target.write_text(html, encoding="utf-8")
+    catalog = build_catalog(out_dir)
+    latest = catalog[0] if catalog else None
 
+    level_totals = {"B1": 0, "B2": 0, "C1": 0}
+    for issue in catalog:
+        for a in issue["articles"]:
+            lv = (a.get("level") or "").upper()
+            if lv in level_totals:
+                level_totals[lv] += 1
+
+    home_html = _env.get_template("home.html.j2").render(
+        page="home",
+        nav="home",
+        issue=latest,
+        featured=featured_articles(latest),
+        counts=_issue_counts(latest),
+        total=latest["count"] if latest else 0,
+        recent=catalog[1:4],
+        level_totals=level_totals,
+    )
+    (out_dir / "index.html").write_text(home_html, encoding="utf-8")
+
+    # 期数卡片数一律以 catalog 为准 —— scan_issues 数的是磁盘上的 article-*.html,
+    # 可能残留旧的孤儿文件,导致 archive 与首页/本期自相矛盾
+    counted = {c["key"]: c["count"] for c in catalog}
+    archive_issues = [{**it, "count": counted.get(it["key"], it.get("count", 0))}
+                      for it in issues]
     archive_html = _env.get_template("archive.html.j2").render(
-        page="archive", issues=issues, issues_count=len(issues),
+        page="archive",
+        nav="archive",
+        issues=archive_issues,
+        pieces=sum(i["count"] for i in archive_issues),
     )
     (out_dir / "archive.html").write_text(archive_html, encoding="utf-8")
 

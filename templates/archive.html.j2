@@ -4,55 +4,57 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Archive · Weekly English</title>
-<link rel="stylesheet" href="static/style.css?v=25" />
+<link rel="stylesheet" href="/static/style.css?v=26" />
 </head>
-<body>
+<body data-page="archive">
 
-<header class="masthead">
-  <div class="wrap">
-    <a class="brand" href="index.html">
-      <span class="logo-mark">W·E</span>
-      <span class="logo-text">Weekly English</span>
-    </a>
-    <nav class="meta">
-      <a class="nav-link" href="index.html">← Latest issue</a>
-    </nav>
-  </div>
-</header>
+{% include "_masthead.html.j2" %}
 
 <main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">Archive</span>
+  </nav>
 
   <section class="cover cover-compact">
     <div class="cover-kicker">Archive</div>
     <h1 class="cover-title">Past issues</h1>
     <div class="cover-meta">
-      <span>{{ issues|length }} issues</span>
+      <span>{{ issues|length }} issue{{ '' if issues|length == 1 else 's' }}</span>
+      <span class="dot"></span>
+      <span>{{ pieces }} pieces in total</span>
     </div>
   </section>
 
-  <section class="archive-list">
-    {% for it in issues %}
-    <a class="archive-row" href="{{ it.path }}">
-      <span class="archive-no">No. {{ it.number }}</span>
-      <span class="archive-week">{{ it.week_label }}</span>
-      <span class="archive-title">{{ it.title }}</span>
-      <span class="archive-count">{{ it.count }} pieces</span>
-      <span class="archive-arrow">→</span>
-    </a>
-    {% endfor %}
-    {% if not issues %}
-    <p class="empty">No previous issues yet. Run <code>run_weekly.py</code> weekly to build an archive.</p>
-    {% endif %}
+  {% if issues %}
+  {% for year, year_issues in issues|groupby('year')|reverse %}
+  <section class="archive-year">
+    <h2 class="archive-year-h2">{{ year }}</h2>
+    <div class="archive-list">
+      {% for it in year_issues %}
+      <a class="archive-row" href="/issue/{{ it.key }}">
+        <span class="archive-no">No. {{ it.number }}</span>
+        <span class="archive-week">{{ it.week_label }}</span>
+        <span class="archive-title">{{ it.title }}</span>
+        <span class="archive-count">{{ it.count }} pieces</span>
+        <span class="archive-arrow">→</span>
+      </a>
+      {% endfor %}
+    </div>
   </section>
+  {% endfor %}
+  {% else %}
+  <section class="archive-list">
+    <p class="empty">No previous issues yet. Run <code>run_weekly.py</code> weekly to build an archive.</p>
+  </section>
+  {% endif %}
 
 </main>
 
-<footer class="foot">
-  <div class="wrap">
-    <span>Weekly English</span>
-    <span>Originals preserved verbatim.</span>
-  </div>
-</footer>
+{% include "_footer.html.j2" %}
 
+<script src="/static/app.js?v=26"></script>
 </body>
 </html>

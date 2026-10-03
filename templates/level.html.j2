@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{{ level }} · {{ level_label }} · Weekly English</title>
+<link rel="stylesheet" href="/static/style.css?v=26" />
+</head>
+<body data-page="level">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">Level {{ level }}</span>
+  </nav>
+
+  <section class="cover cover-compact cover-{{ level|lower }}">
+    <div class="cover-kicker">Level {{ level }}</div>
+    <h1 class="cover-title">{{ level_label }}</h1>
+    <div class="cover-meta">
+      <span>{{ total }} piece{{ '' if total == 1 else 's' }} across {{ groups|length }} issue{{ '' if groups|length == 1 else 's' }}</span>
+    </div>
+    <p class="cover-blurb">{{ level_blurb }}</p>
+  </section>
+
+  <nav class="level-switch" aria-label="Other levels">
+    {% for lv, lb in [("B1", "Starter"), ("B2", "Intermediate"), ("C1", "Advanced")] %}
+    <a class="chip chip-{{ lv|lower }}{% if lv == level %} is-on{% endif %}"
+       href="/level/{{ lv }}"
+       {% if lv == level %}aria-current="page"{% endif %}>{{ lv }} · {{ lb }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if groups %}
+    {% for g in groups %}
+    <section class="level-group">
+      <div class="home-block-head">
+        <h2 class="home-h2">
+          <a href="/issue/{{ g.issue_key }}">{{ g.week_label }}</a>
+        </h2>
+        <span class="level-group-count">{{ g.articles|length }} piece{{ '' if g.articles|length == 1 else 's' }}</span>
+      </div>
+      <div class="cards">
+        {% for art in g.articles %}
+        <a class="card card-{{ level|lower }}" href="/issue/{{ g.issue_key }}/article-{{ art.id }}.html">
+          <div class="card-head">
+            <span class="src">{{ art.source }}</span>
+            <span class="chip chip-{{ level|lower }}">{{ level }}</span>
+          </div>
+          <h3 class="card-title">{{ art.title }}</h3>
+          <p class="card-deck">{{ art.deck }}</p>
+          <div class="card-foot">
+            {% if art.words %}<span>{{ art.words }} words</span><span class="dot"></span>{% endif %}
+            <span>{{ g.week_label }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  {% else %}
+    <section class="archive-list">
+      <p class="empty">No {{ level }} pieces yet. Check back after the next issue.</p>
+    </section>
+  {% endif %}
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="/static/app.js?v=26"></script>
+</body>
+</html>

@@ -4,23 +4,19 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>{{ title }} · Weekly English</title>
-<link rel="stylesheet" href="/static/style.css?v=25" />
+<link rel="stylesheet" href="/static/style.css?v=26" />
 </head>
 <body data-page="auth" data-mode="{{ mode }}">
 
-<header class="masthead">
-  <div class="wrap">
-    <a class="brand" href="/">
-      <span class="logo-mark">W·E</span>
-      <span class="logo-text">Weekly English</span>
-    </a>
-    <nav class="meta">
-      <a class="nav-link" href="/">← Back to latest issue</a>
-    </nav>
-  </div>
-</header>
+{% include "_masthead.html.j2" %}
 
 <main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">Account</span>
+  </nav>
 
   <section class="cover cover-compact">
     <div class="cover-kicker">Account</div>
@@ -55,12 +51,7 @@
 
 </main>
 
-<footer class="foot">
-  <div class="wrap">
-    <span>Weekly English</span>
-    <span>Originals preserved verbatim.</span>
-  </div>
-</footer>
+{% include "_footer.html.j2" %}
 
 <script src="/static/auth.js"></script>
 </body>

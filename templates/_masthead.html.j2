@@ -1,0 +1,46 @@
+{% set nav = nav|default('', true) %}
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <a class="brand" href="/">
+      <span class="logo-mark">W·E</span>
+      <span class="logo-text">Weekly English</span>
+    </a>
+
+    <button class="nav-burger" type="button" aria-label="Show navigation"
+            aria-expanded="false" aria-controls="site-nav">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor"
+              stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <nav class="site-nav" id="site-nav" aria-label="Site">
+      <a class="nav-item{% if nav == 'home' %} is-active{% endif %}" href="/"
+         {% if nav == 'home' %}aria-current="page"{% endif %}>Home</a>
+
+      <a class="nav-item{% if nav == 'issue' %} is-active{% endif %}" href="/issue/latest"
+         {% if nav == 'issue' %}aria-current="page"{% endif %}>Latest issue</a>
+
+      <a class="nav-item{% if nav == 'archive' %} is-active{% endif %}" href="/archive"
+         {% if nav == 'archive' %}aria-current="page"{% endif %}>Archive</a>
+
+      <span class="nav-levels" role="group" aria-label="Browse by level">
+        <span class="nav-levels-label">Level</span>
+        {% for lv in ['B1', 'B2', 'C1'] %}
+        <a class="nav-level lv-{{ lv|lower }}{% if nav == 'level-' + lv %} is-active{% endif %}"
+           href="/level/{{ lv }}"
+           {% if nav == 'level-' + lv %}aria-current="page"{% endif %}>{{ lv }}</a>
+        {% endfor %}
+      </span>
+
+      <form class="nav-search" action="/search" method="get" role="search">
+        <input type="search" name="q" value="{{ q|default('', true) }}"
+               placeholder="Search articles…" aria-label="Search articles" autocomplete="off" />
+      </form>
+
+      <a class="nav-item nav-account{% if nav == 'me' %} is-active{% endif %}" id="account-link"
+         href="{% if nav == 'me' %}/me{% else %}/auth/login{% endif %}"
+         {% if nav == 'me' %}aria-current="page"{% endif %}>{% if nav == 'me' %}My learning{% else %}Sign in{% endif %}</a>
+    </nav>
+  </div>
+</header>

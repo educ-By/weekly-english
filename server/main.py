@@ -20,7 +20,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Query, Request, Depends
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import (HTMLResponse, FileResponse, JSONResponse,
+                               RedirectResponse)
 from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -40,6 +41,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 _TPL_ENV = Environment(
     loader=FileSystemLoader(str(ROOT / "templates")),
     autoescape=select_autoescape(["html"]),
+    trim_blocks=True, lstrip_blocks=True,
 )
 
 logging.basicConfig(
@@ -97,9 +99,15 @@ def _latest_issue_key() -> Optional[str]:
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    key = _latest_issue_key()
-    if not key:
-        # 没有期数时自动触发一次
+    """首页门户 —— 独立于最新一期的 /issue/{key}。"""
+    path = OUT_DIR / "index.html"
+    # catalog.json 缺失说明卷上还是改造前的旧版静态页 —— 就地重建,不必重新联网抓取
+    if not path.exists() or not (OUT_DIR / "catalog.json").exists():
+        issues = core.scan_issues(OUT_DIR)
+        if issues:
+            core.write_index_landing(OUT_DIR, issues)
+    if not path.exists():
+        # 一期都还没有 —— 自动触发一次抓取
         log.info("No issue found, triggering refresh...")
         result = core.full_refresh(OUT_DIR)
         if not result.get("ok"):
@@ -108,10 +116,8 @@ def index():
                 "<p>No articles collected yet. Check your RSS sources and network.</p>",
                 status_code=503,
             )
-        key = result["issue_key"]
-    path = OUT_DIR / key / "index.html"
     if not path.exists():
-        raise HTTPException(404, "Issue page missing.")
+        raise HTTPException(404, "Home page missing.")
     return HTMLResponse(path.read_text(encoding="utf-8"))
 
 
@@ -123,6 +129,18 @@ def archive():
         issues = core.scan_issues(OUT_DIR)
         core.write_index_landing(OUT_DIR, issues)
     return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/issue/latest")
+def issue_latest():
+    """/issue/latest → 重定向到当前最新一期。
+
+    声明位置必须早于 /issue/{key},否则会被参数路由吃掉。
+    """
+    key = _latest_issue_key()
+    if not key:
+        raise HTTPException(404, "No issues rendered yet")
+    return RedirectResponse(f"/issue/{key}", status_code=307)
 
 
 @app.get("/issue/article-{article_id}.html", response_class=HTMLResponse)
@@ -183,6 +201,87 @@ def article_latest(article_id: str):
     if not path.exists():
         raise HTTPException(404, "Article not found")
     return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+# ---------- 跨期浏览:/level 与 /search ----------
+LEVEL_META = {
+    "B1": ("Starter", "Short sentences and everyday vocabulary — a comfortable place to begin."),
+    "B2": ("Intermediate", "Longer pieces with a wider vocabulary; the bulk of each issue."),
+    "C1": ("Advanced", "Dense prose and demanding vocabulary, close to native newsroom writing."),
+}
+
+# catalog.json 的 mtime 缓存 —— 每周刷新后自动失效重载,平时不重复读盘
+_CATALOG_CACHE: dict = {"mtime": None, "issues": []}
+
+
+def _catalog() -> list[dict]:
+    path = OUT_DIR / "catalog.json"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        mtime = None
+    if mtime is None or _CATALOG_CACHE["mtime"] != mtime:
+        _CATALOG_CACHE["issues"] = core.load_catalog(OUT_DIR)
+        try:
+            _CATALOG_CACHE["mtime"] = path.stat().st_mtime
+        except OSError:
+            _CATALOG_CACHE["mtime"] = None
+    return _CATALOG_CACHE["issues"]
+
+
+@app.get("/level/{level}", response_class=HTMLResponse)
+def level_page(level: str):
+    lv = level.upper()
+    if lv not in LEVEL_META:
+        raise HTTPException(404, f"Unknown level: {level}")
+    label, blurb = LEVEL_META[lv]
+
+    groups, total = [], 0
+    for issue in _catalog():
+        picks = [a for a in issue["articles"]
+                 if (a.get("level") or "").upper() == lv]
+        if not picks:
+            continue
+        groups.append({
+            "issue_key": issue["key"],
+            "week_label": issue["week_label"],
+            "title": issue["title"],
+            "articles": picks,
+        })
+        total += len(picks)
+
+    html = _TPL_ENV.get_template("level.html.j2").render(
+        page="level", nav="level-" + lv, level=lv,
+        level_label=label, level_blurb=blurb,
+        groups=groups, total=total,
+    )
+    return HTMLResponse(html)
+
+
+@app.get("/search", response_class=HTMLResponse)
+def search_page(q: str = ""):
+    """全站搜索 —— 结果有自己的 URL,可分享、可回退。"""
+    query = (q or "").strip()
+    results: list[dict] = []
+    if query:
+        needle = query.lower()
+        for issue in _catalog():
+            for a in issue["articles"]:
+                haystack = f"{a.get('title', '')}\n{a.get('search', '')}".lower()
+                if needle in haystack:
+                    results.append({
+                        "id": a["id"],
+                        "title": a.get("title", ""),
+                        "level": a.get("level", ""),
+                        "deck": a.get("deck", ""),
+                        "issue_key": issue["key"],
+                        "week_label": issue["week_label"],
+                    })
+    html = _TPL_ENV.get_template("search.html.j2").render(
+        page="search", nav="search", q=query, results=results,
+        total=len(results),
+    )
+    return HTMLResponse(html)
 
 
 # ---------- API ----------
@@ -328,42 +427,23 @@ def me(user: db.User = Depends(auth.require_user)):
 @app.get("/auth/login", response_class=HTMLResponse)
 def auth_login_page():
     html = _TPL_ENV.get_template("auth.html.j2").render(
-        title="Sign in", mode="login")
+        page="auth", nav="", title="Sign in", mode="login")
     return HTMLResponse(html)
 
 
 @app.get("/auth/register", response_class=HTMLResponse)
 def auth_register_page():
     html = _TPL_ENV.get_template("auth.html.j2").render(
-        title="Create account", mode="register")
+        page="auth", nav="", title="Create account", mode="register")
     return HTMLResponse(html)
 
 
-# ---------- 个人页(生词本 + 阅读历史)----------
+# ---------- 个人页(生词本 + 阅读进度 + 阅读历史)----------
 @app.get("/me", response_class=HTMLResponse)
 def me_page():
-    # 前端 JS 拿 token 读 /api/v1/vocab 与 /api/v1/progress
-    return HTMLResponse(
-        "<!doctype html><html><head><meta charset=utf-8>"
-        "<title>Me · Weekly English</title>"
-        "<link rel=stylesheet href=/static/style.css></head>"
-        "<body data-page=me><header class=masthead><div class=wrap>"
-        "<a class=brand href=/><span class=logo-mark>W·E</span>"
-        "<span class=logo-text>Weekly English</span></a>"
-        "<nav class=meta><a class=nav-link href=/>← Latest issue</a></nav>"
-        "</div></header><main class=wrap>"
-        "<section class=cover cover-compact>"
-        "<div class=cover-kicker>Account</div>"
-        "<h1 class=cover-title id=me-title>Loading…</h1>"
-        "<div class=cover-meta id=me-meta></div>"
-        "</section>"
-        "<section id=me-content><p>Loading your data…</p></section>"
-        "</main><footer class=foot><div class=wrap>"
-        "<span>Weekly English</span>"
-        "<span>Originals preserved verbatim.</span>"
-        "</div></footer>"
-        "<script src=/static/me.js></script></body></html>"
-    )
+    # 页面骨架交给模板,三个区块的数据由 static/me.js 拿 token 填充
+    html = _TPL_ENV.get_template("me.html.j2").render(page="me", nav="me")
+    return HTMLResponse(html)
 
 
 @app.get("/auth/logout")
@@ -508,6 +588,27 @@ def list_progress(sess: Session = Depends(db.get_db),
     ]}
 
 
+@app.get("/api/v1/history")
+def list_history(limit: int = Query(60, ge=1, le=500),
+                 sess: Session = Depends(db.get_db),
+                 user: db.User = Depends(auth.require_user)):
+    """最近的打开记录 —— /me 的「阅读历史」区块用。"""
+    rows = (sess.query(db.ReadingHistory)
+            .filter_by(user_id=user.id)
+            .order_by(db.ReadingHistory.opened_at.desc())
+            .limit(limit).all())
+    return {"entries": [
+        {
+            "id": r.id,
+            "issue_key": r.issue_key,
+            "article_id": r.article_id,
+            "title": r.title,
+            "opened_at": r.opened_at.isoformat() if r.opened_at else None,
+        }
+        for r in rows
+    ]}
+
+
 # ---------- 辅助 ----------
 def _load_articles_context(issue_key: str) -> list[dict]:
     """从本期索引里抽出文章的标题/URL/来源,作为 LLM 上下文。"""
@@ -536,6 +637,25 @@ def _load_articles_context(issue_key: str) -> list[dict]:
 
 # ---------- 启动时不阻塞:后台线程做初始抓取 ----------
 def _background_refresh_once():
+    # 1) 改造前生成的期没有 meta.json —— 就地从它们自己的 HTML 重渲染,保证全站模板一致
+    try:
+        rebuilt = core.rebuild_legacy_issues(OUT_DIR)
+    except Exception as e:
+        rebuilt = 0
+        log.warning("Legacy issue rebuild failed: %s", e)
+
+    # 2) catalog.json 缺失(旧卷)或刚迁移过 —— 重建首页 / archive / 跨期索引
+    if rebuilt or not (OUT_DIR / "catalog.json").exists():
+        try:
+            issues = core.scan_issues(OUT_DIR)
+            if issues:
+                core.write_index_landing(OUT_DIR, issues)
+                log.info("Rebuilt home + catalog (%d issue(s), %d migrated)",
+                         len(issues), rebuilt)
+        except Exception as e:
+            log.warning("Landing rebuild failed: %s", e)
+
+    # 3) 一期都没有时才联网抓取
     if not (OUT_DIR / "index.html").exists():
         try:
             core.full_refresh(OUT_DIR)

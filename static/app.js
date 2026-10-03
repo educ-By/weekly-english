@@ -8,9 +8,20 @@
 (() => {
   "use strict";
 
-  /* ---------------- 主页筛选 ---------------- */
+  /* ---------------- 全局导航(窄屏折叠) ---------------- */
   const page = document.body.dataset.page;
 
+  function bindNav() {
+    const burger = document.querySelector(".nav-burger");
+    const nav = document.getElementById("site-nav");
+    if (!burger || !nav) return;
+    burger.addEventListener("click", () => {
+      const open = nav.classList.toggle("is-open");
+      burger.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
+
+  /* ---------------- 本期页筛选 ---------------- */
   function bindIndex() {
     const cards = Array.from(document.querySelectorAll(".card"));
     const status = document.getElementById("status");
@@ -18,8 +29,26 @@
     if (!cards.length) return;
 
     const search = document.getElementById("q");
-    let level = "all";
+    const params = new URLSearchParams(location.search);
+    let level = (params.get("level") || "all").toUpperCase();
+    if (!["B1", "B2", "C1"].includes(level)) level = "all";
     let source = "all";
+
+    if (search && params.get("q")) search.value = params.get("q");
+
+    // 把当前筛选写回地址栏 —— 结果可分享、可回退,而不是一次性的页面内状态
+    let urlTimer = null;
+    function syncUrl() {
+      clearTimeout(urlTimer);
+      urlTimer = setTimeout(() => {
+        const p = new URLSearchParams(location.search);
+        const q = (search?.value || "").trim();
+        if (q) p.set("q", q); else p.delete("q");
+        if (level !== "all") p.set("level", level); else p.delete("level");
+        const qs = p.toString();
+        history.replaceState(null, "", location.pathname + (qs ? "?" + qs : ""));
+      }, 250);
+    }
 
     function apply() {
       const q = (search?.value || "").trim().toLowerCase();
@@ -46,6 +75,7 @@
       });
       if (status) status.textContent = `Showing ${n} of ${cards.length}`;
       if (empty) empty.hidden = n !== 0;
+      syncUrl();
     }
 
     // 层标题点击 = 折叠/展开该层
@@ -78,6 +108,11 @@
         source = btn.dataset.value;
         apply();
       }));
+
+    // 地址栏里的 level 参数要反映到 chip 高亮上
+    document.querySelectorAll('.filter-group[data-filter="level"] .chip')
+      .forEach(b => b.classList.toggle("is-on",
+        (b.dataset.value || "").toUpperCase() === level));
 
     search?.addEventListener("input", apply);
     apply();
@@ -708,6 +743,7 @@
       try { fn(); }
       catch (e) { window.__initErrors.push(name + ": " + (e && e.message || e)); }
     };
+    safe("bindNav", bindNav);
     if (page === "index") safe("bindIndex", bindIndex);
     if (page === "article") {
       safe("bindReading", bindReading);

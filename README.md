@@ -103,17 +103,35 @@ python -m uvicorn server.main:app --host 127.0.0.1 --port 8000
 
 ## API 端点
 
+页面(每个都有唯一 URL,顶部导航常驻):
+
 | 端点 | 方法 | 说明 |
 | --- | --- | --- |
-| `/` | GET | 最新一期主页(自动渲染,若无则后台拉取) |
-| `/archive` | GET | 全部历史期号 |
-| `/issue/{key}` | GET | 指定期号(如 `/issue/2026-W38`) |
-| `/article/{issue_key}/{article_id}` | GET | 单篇精读页 |
+| `/` | GET | 首页门户:本期 hero + 精选 + 难度入口 + 最近往期(不是本期的副本) |
+| `/archive` | GET | 往期列表,按年份分组 |
+| `/issue/latest` | GET | 307 重定向到当前最新一期 |
+| `/issue/{key}` | GET | 某一期的目录页(Contents + 本期词表汇总 + 分层卡片) |
+| `/issue/{key}/article-{id}.html` | GET | 单篇精读页(面包屑 + 上下篇 + 相关阅读) |
+| `/level/{B1\|B2\|C1}` | GET | 难度专区:跨所有期聚合该难度文章 |
+| `/search?q=` | GET | 全站搜索,结果有自己的 URL |
+| `/me` | GET | 我的学习页:生词本 / 阅读进度 / 阅读历史 |
+| `/auth/login`·`/auth/register` | GET | 登录 / 注册 |
+| `/{key}/index.html` 等旧路径 | GET | 兜底路由,历史链接不失效 |
+
+接口:
+
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
 | `/api/issues` | GET | JSON:全部期号列表 |
 | `/api/dict?word=X&sentence=Y` | GET | DeepSeek 词典查询(返回 JSON) |
 | `/api/ask` | POST | 提问 DeepSeek,自动带上下文 |
+| `/api/v1/vocab`·`/api/v1/progress`·`/api/v1/history` | GET/POST/DELETE | 生词本 / 阅读进度 / 阅读历史(需 Bearer token) |
 | `/api/admin/refresh` | POST | 手动触发本周抓取 |
 | `/healthz` | GET | 健康检查(Render 用) |
+
+跨期页面(`/level`、`/search`、首页)读的是渲染期产出的索引:每期目录下有
+`meta.json`,汇总成 `data/output/catalog.json`。改造前生成的旧期没有 `meta.json`,
+服务启动时会就地从它们自己的 HTML 还原并重渲染一次(幂等),之后不再触发。
 
 ### `/api/ask` 示例
 
@@ -252,7 +270,7 @@ BBC Learning English*
 - ✅ 多 RSS 源聚合
 - ✅ CEFR B1/B2/C1 自动分级
 - ✅ 真实词表驱动的超纲词高亮(白名单 + 词形闭包)
-- ✅ 主页/精读页/archive 三层 UI
+- ✅ 多页刊物式信息架构:首页门户 / 本期目录 / 精读页 / 往期(按年分组)/ 难度专区 / 全站搜索 / 我的学习,共享常驻导航与面包屑
 - ✅ Web Speech 朗读 + 自定义音频上传
 - ✅ DeepSeek 词典查询(端点式释义)
 - ✅ DeepSeek 提问(严格 scope guard)

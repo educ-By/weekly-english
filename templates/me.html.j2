@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>My learning · Weekly English</title>
+<link rel="stylesheet" href="/static/style.css?v=26" />
+</head>
+<body data-page="me">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">My learning</span>
+  </nav>
+
+  <section class="cover cover-compact">
+    <div class="cover-kicker">Account</div>
+    <h1 class="cover-title" id="me-title">Loading…</h1>
+    <div class="cover-meta" id="me-meta"></div>
+  </section>
+
+  <div id="me-content">
+    <section class="me-section">
+      <h2 class="me-h2" id="me-vocab-h2">My vocabulary</h2>
+      <div class="me-slot" id="me-vocab"><p class="me-empty">Loading your words…</p></div>
+    </section>
+
+    <section class="me-section">
+      <h2 class="me-h2" id="me-progress-h2">Reading progress</h2>
+      <div class="me-slot" id="me-progress"><p class="me-empty">Loading your progress…</p></div>
+    </section>
+
+    <section class="me-section">
+      <h2 class="me-h2" id="me-history-h2">Reading history</h2>
+      <div class="me-slot" id="me-history"><p class="me-empty">Loading your history…</p></div>
+    </section>
+  </div>
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="/static/me.js"></script>
+</body>
+</html>
