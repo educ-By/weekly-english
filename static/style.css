@@ -962,9 +962,10 @@ body.is-selecting { cursor: text; }
   border: 1px solid var(--line); border-radius: 999px;
   padding: 6px 14px; width: 170px; outline: none;
   color: var(--ink); background: #fff;
-  transition: border-color .15s ease, width .15s ease;
+  transition: border-color .15s ease;
 }
-.nav-search input:focus { border-color: var(--accent); width: 210px; }
+/* 聚焦只换边框色 —— 不再加宽(加宽会把 masthead 挤到折行、内容整块往下跳) */
+.nav-search input:focus { border-color: var(--accent); }
 .nav-burger {
   display: none;
   background: none; border: 1px solid var(--line);

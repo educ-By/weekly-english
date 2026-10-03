@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>{% if q %}Search · {{ q }}{% else %}Search{% endif %} · Weekly English</title>
 <meta name="robots" content="noindex" />
-<link rel="stylesheet" href="/static/style.css?v=31" />
+<link rel="stylesheet" href="/static/style.css?v=32" />
 </head>
 <body data-page="search">
 
@@ -33,7 +33,7 @@
     </div>
   </section>
 
-  <form class="search-page-form" action="/search" method="get" role="search">
+  <form class="search-page-form" action="/search" method="get" role="search" autocomplete="off">
     <label class="search">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
@@ -66,6 +66,6 @@
 
 {% include "_footer.html.j2" %}
 
-<script src="/static/app.js?v=39"></script>
+<script src="/static/app.js?v=40"></script>
 </body>
 </html>

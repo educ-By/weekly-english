@@ -33,7 +33,7 @@
         {% endfor %}
       </span>
 
-      <form class="nav-search" action="/search" method="get" role="search">
+      <form class="nav-search" action="/search" method="get" role="search" autocomplete="off">
         <input type="search" name="q" value="{{ q|default('', true) }}"
                placeholder="Search articles…" aria-label="Search articles" autocomplete="off" />
       </form>

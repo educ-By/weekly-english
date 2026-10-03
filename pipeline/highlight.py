@@ -217,6 +217,18 @@ _IRREGULAR.update({
 # 常见缩写(非动词缩写形)——列出以免被当生词
 _COMMON_ABBREV = {"approx", "asap", "dept", "govt", "etc", "vs", "eg", "ie", "aka"}
 
+# 常见构词前缀 / 后缀 —— 去掉后若落在白名单内,即视为"已知词的派生",不标超纲
+_PREFIXES = ("un", "in", "im", "il", "ir", "dis", "non", "re", "pre", "post",
+             "over", "under", "super", "sub", "inter", "trans", "anti", "multi",
+             "semi", "mis", "out", "up", "co", "bi", "tri", "mono", "auto",
+             "micro", "macro", "mini", "mid", "self", "well", "ill", "half", "fore")
+_SUFFIXES = ("ation", "ition", "tion", "sion", "ion", "ment", "ness", "ity", "ety",
+             "ance", "ence", "ant", "ent", "ary", "ery", "ism", "ist", "ee",
+             "er", "or", "ar", "ical", "ic", "ial", "al", "ive", "ious", "ous",
+             "ful", "less", "able", "ible", "ably", "ibly", "ly", "y", "age",
+             "hood", "ship", "ward", "wise", "ize", "ise", "ate", "ed", "ing",
+             "s", "es")
+
 # 缩写还原表 — 不规则缩写(不能靠简单去后缀得到原型)
 _CONTRACTION_BASE = {
     "won't": "will", "can't": "can", "cannot": "can",
@@ -319,7 +331,34 @@ def _lemmas(t: str) -> list[str]:
     # -cked → -c(panicked→panic)
     if s.endswith("cked"):
         add_irregular(s[:-4])
+    # 派生剥离:逐轮去掉常见前缀/后缀,覆盖 dishonest→honest、undocumented→document、
+    # destroyers→destroy、appointees→appoint、dishonesty→dishonest→honest
+    queue = list(out)
+    for _ in range(3):
+        nxt = []
+        for c in queue:
+            for pre in _PREFIXES:
+                if c.startswith(pre) and len(c) >= len(pre) + 3:
+                    nxt.append(c[len(pre):])
+            for suf in _SUFFIXES:
+                if c.endswith(suf) and len(c) >= len(suf) + 3:
+                    nxt.append(c[:-len(suf)])
+        if not nxt:
+            break
+        for c in nxt:
+            add_irregular(c)
+        queue = nxt
     return out
+
+
+def _known_compound(w: str, vocab: set[str]) -> bool:
+    """w 能否拆成两个都在白名单里的词(dataset = data+set、newsroom = news+room)。"""
+    if len(w) < 7:
+        return False
+    for i in range(3, len(w) - 2):
+        if w[:i] in vocab and w[i:] in vocab:
+            return True
+    return False
 
 
 # 智能引号 → ASCII,避免 "doesn’t"/"world’s" 被切成 "doesn"/"world"
@@ -439,7 +478,11 @@ def find_out_of_scope_words(text: str,
         if t in vocab:
             continue
         # 任一常见变体原型命中白名单 → 不标
-        if any(c in vocab for c in _lemmas(t)):
+        cands = _lemmas(t)
+        if any(c in vocab for c in cands):
+            continue
+        # 拼接复合词:能拆成两个白名单内的词 → 不标(dataset/newsroom/airstrike)
+        if any(_known_compound(c, vocab) for c in cands):
             continue
         # 连字符复合词:各段都在白名单内 → 不标(year-old、high-speed、wake-up)
         if "-" in t:
