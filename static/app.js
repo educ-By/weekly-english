@@ -21,6 +21,58 @@
     });
   }
 
+  /* ---------------- 折叠层的高度过渡 ----------------
+     CSS 只定义"折叠后长什么样"(.is-closed → height:0 + padding:0 + overflow:hidden);
+     这里负责切换瞬间把高度钉成像素值,让 height 可插值 —— 直接 height:auto ↔ 0 是不过渡的。
+     打不动的场景(无 JS / 减少动态效果 / 筛选联动)就走非动画分支,直接落到 CSS 状态。 */
+  const prefersReducedMotion = () =>
+    !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const collapseTokens = new WeakMap();   // body → 当前动画令牌,用于作废过期回调
+
+  // 量出"展开时"的自然高度:临时解除折叠量一次,同步还原,不会产生可见闪烁
+  function naturalHeight(block, body) {
+    const inlineH = body.style.height;
+    const wasClosed = block.classList.contains("is-closed");
+    body.style.height = "";
+    block.classList.remove("is-closed");
+    const h = body.getBoundingClientRect().height;
+    body.style.height = inlineH;
+    if (wasClosed) block.classList.add("is-closed");
+    return h;
+  }
+
+  function setCollapsed(block, collapsed, animate) {
+    const body = block.querySelector(".block-body");
+    if (!body) return;
+
+    if (!animate || prefersReducedMotion()) {
+      collapseTokens.set(body, Symbol());     // 作废进行中的动画,免得它的收尾把状态清掉
+      body.style.height = "";
+      block.classList.toggle("is-closed", collapsed);
+      return;
+    }
+
+    const token = Symbol();
+    collapseTokens.set(body, token);
+
+    const from = body.getBoundingClientRect().height;
+    const to = collapsed ? 0 : naturalHeight(block, body);
+
+    body.style.height = from + "px";           // 钉住起始值
+    void body.offsetHeight;                    // 强制重排,否则起止值会被合并成一次样式变更
+    block.classList.toggle("is-closed", collapsed);
+    body.style.height = to + "px";
+
+    const done = (e) => {
+      if (e && (e.target !== body || e.propertyName !== "height")) return;
+      body.removeEventListener("transitionend", done);
+      if (collapseTokens.get(body) !== token) return;
+      body.style.height = "";                  // 交还 auto,窗口尺寸变化时还能自适应
+    };
+    body.addEventListener("transitionend", done);
+    setTimeout(done, 400);                     // transitionend 万一不来也要收尾
+  }
+
   /* ---------------- 本期页筛选 ---------------- */
   function bindIndex() {
     const cards = Array.from(document.querySelectorAll(".card"));
@@ -68,8 +120,9 @@
         if (show) { n += 1; blockVisible[lvl] = (blockVisible[lvl] || 0) + 1; }
       });
       // 分层联动:筛选/搜索时自动展开所有层,没有命中内容的层整层隐藏
+      // 不带动画 —— 边打字边展开会拖慢手感
       document.querySelectorAll(".level-block").forEach(block => {
-        if (filtering) block.classList.remove("is-closed");
+        if (filtering) setCollapsed(block, false, false);
         const lvl = block.dataset.block || "";
         block.hidden = filtering && !!lvl && !blockVisible[lvl];
       });
@@ -82,7 +135,8 @@
     document.querySelectorAll("[data-toggle-block]").forEach(head => {
       head.addEventListener("click", () => {
         const block = head.closest(".level-block");
-        if (block) block.classList.toggle("is-closed");
+        if (!block) return;
+        setCollapsed(block, !block.classList.contains("is-closed"), true);
       });
     });
 
@@ -172,6 +226,11 @@
       x = Math.max(8, Math.min(window.innerWidth - pw - 8, x));
       popup.style.left = x + "px";
       popup.style.top = y + "px";
+      // 弹窗复用同一个 DOM,只改 left/top —— 不重放动画的话,连续悬停时它会瞬移到新位置。
+      // 强制一次重排让动画能重新触发(re-trigger 的标准做法)。
+      popup.classList.remove("is-in");
+      void popup.offsetWidth;
+      popup.classList.add("is-in");
     }
 
     // 把当前文章上下文写到 popup 上,供"加入生词本"按钮使用
@@ -259,6 +318,10 @@
         box.hidden = false;
         box.classList.toggle("is-err", !!(opts && opts.err));
         box.classList.toggle("is-ok", !!(opts && opts.ok));
+        // 状态条常驻 DOM、靠 hidden 反复开关,重放一次淡入免得每次都硬蹦出来
+        box.classList.remove("is-in");
+        void box.offsetWidth;
+        box.classList.add("is-in");
         if (opts && opts.autoHide) {
           clearTimeout(timer);
           timer = setTimeout(() => { box.hidden = true; }, opts.autoHide);

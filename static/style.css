@@ -21,6 +21,11 @@
                 Georgia, "Times New Roman", serif;
   --font-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
                 "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+  /* 动效令牌 —— 全站统一的时长与缓动,别再各写各的 .12s/.15s */
+  --dur-fast:   0.13s;
+  --dur:        0.18s;
+  --dur-slow:   0.26s;
+  --ease:       cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 * { box-sizing: border-box; }
@@ -681,7 +686,11 @@ a:hover { color: var(--accent); }
   .entry { box-shadow: none; border-color: #ccc; page-break-inside: avoid; }
   .entry-meta a.src { border-bottom: 0; }
   /* 屏幕上是折叠状态的难度层,纸上要展开,否则导出的 PDF 是空的 */
-  .level-block.is-closed .block-body { display: grid !important; }
+  .level-block.is-closed .block-body {
+    height: auto !important;
+    padding-top: 20px !important;
+    padding-bottom: 30px !important;
+  }
   .level-block .block-caret { display: none; }
   .card { page-break-inside: avoid; }
 }
@@ -715,10 +724,27 @@ a:hover { color: var(--accent); }
 .level-block .block-title { font-weight: 600; }
 .level-block .block-caret {
   margin-left: auto;
-  transition: transform 0.15s ease;
+  transition: transform var(--dur) var(--ease);
 }
 .level-block.is-closed .block-caret { transform: rotate(-90deg); }
-.level-block.is-closed .block-body { display: none; }
+
+/* 折叠动画:原先对 .block-body 直接 display:none —— 箭头转了、内容却瞬间消失,
+   只做了一半反而更突兀。CSS 负责"折叠后长什么样",JS 负责切换瞬间把高度钉成
+   具体像素,好让浏览器有可插值的起止值(app.js 的 setCollapsed)。
+   注意:这里刻意不用 grid-template-rows 0fr↔1fr —— 在高度自动的容器里
+   0fr 会退化成 max-content,行收不掉(实测 0px 也不行)。
+   padding 一并过渡,否则 height 到 0 后那 50px 内边距还戳在外面。 */
+.level-block .block-body {
+  overflow: hidden;
+  transition: height var(--dur-slow) var(--ease),
+              padding-top var(--dur-slow) var(--ease),
+              padding-bottom var(--dur-slow) var(--ease);
+}
+.level-block.is-closed .block-body {
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
 
 /* ---- AI 对话 token 用量提示 ---- */
 .ask-usage {
@@ -784,6 +810,57 @@ a:hover { color: var(--accent); }
 }
 .xlat-status.is-ok { color: var(--b1, #4f7a59); }
 .xlat-status.is-err { color: var(--c1, #7a3b3b); }
+
+/* ==================================================================
+   动效层 —— 只改「怎么动」,不改视觉风格
+   原则:① 进场有过渡、② 尊重系统的「减少动态效果」、③ 时长统一走令牌
+   ================================================================== */
+
+/* ---- 词汇弹窗:每次定位到新词重放入场动画 ----
+   弹窗复用同一个 DOM,只改 left/top。原先连续悬停时它会像瞬移一样跳到新位置;
+   淡入 + 微下移让它读起来是「重新出现」而不是「飘过去」。
+   刻意不做 left/top 过渡:跨屏跳词时会拖出一条滑行轨迹,反而更晃。 */
+.vocab-popup.is-in { animation: pop-in var(--dur-fast) var(--ease) both; }
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(3px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- 翻译引擎状态条:每次显示都淡入(元素常驻,不重放就只在首次生效) ---- */
+.xlat-status.is-in { animation: pop-in var(--dur) var(--ease) both; }
+
+/* ---- 移动端菜单展开 ---- */
+@keyframes nav-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- 页面切换:跨文档 View Transitions(Chrome/Edge 126+、Safari 18+) ----
+   一行 CSS 让站内跳转有淡入淡出,不用把站点改成 SPA。 */
+@view-transition { navigation: auto; }
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur);
+  animation-timing-function: var(--ease);
+}
+/* 不支持跨文档 VT 的浏览器(含 Firefox)退化成新页面淡入,
+   用 @supports 挡住,避免和 VT 叠加成双重动画 */
+@supports not (view-transition-name: none) {
+  body { animation: page-in var(--dur) var(--ease) both; }
+}
+@keyframes page-in { from { opacity: 0; } }
+
+/* ---- 系统级「减少动态效果」必须真正生效 ----
+   放在文件最后,以便盖掉上面所有过渡;动画仍会瞬间走完终态,
+   不会把元素卡在 opacity:0。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 /* ==================================================================
    站点骨架 —— 全局导航 / 面包屑 / 页脚 / 首页 / 目录 / 分区页 / 搜索
@@ -871,7 +948,8 @@ a:hover { color: var(--accent); }
     padding: 12px 0 4px;
     border-top: 1px solid var(--line);
   }
-  .site-nav.is-open { display: flex; }
+  /* 展开时淡入并轻微下移,不再「啪」一下弹出 */
+  .site-nav.is-open { display: flex; animation: nav-in var(--dur) var(--ease) both; }
   .nav-levels { border-left: 0; padding-left: 0; }
   .nav-search, .nav-search input, .nav-search input:focus { width: 100%; }
 }
