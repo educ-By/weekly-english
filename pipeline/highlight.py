@@ -20,6 +20,32 @@ VOCAB_DIR = Path(__file__).resolve().parent.parent / "data" / "cefr_vocab"
 # 至少含 4 个字母,允许连字符、撇号(do-it-yourself)
 _WORD_RE = re.compile(r"\b[A-Za-z][A-Za-z'-]{3,}\b")
 
+# 正文里常混进抓取残留整条 URL(CBS 的 "link copied" 样板行就是这样),
+# 不先抹掉的话分词会从里面切出 https / cbsnews / 标题 slug 当"超纲词"。
+_URL_RE = re.compile(
+    r"(?:https?://|www\.)\S+"
+    r"|[\w.+-]+@[\w-]+\.[\w.]+"
+    r"|\b[\w-]+\.(?:com|org|net|cn|uk|io|gov|edu|co|info|biz|tv|me|ai)\b(?:/\S*)?",
+    re.I,
+)
+
+# 多连字符长串 = 标题 slug(once-in-a-lifetime 这种短语不属词汇表范畴,跳过)
+_SLUG_RE = re.compile(r"^[a-z]+(?:-[a-z]+){3,}$")
+# 化学名:p-nitrotoluene / alpha-synuclein / copper-beryllium
+_CHEM_RE = re.compile(r"-[a-z]{4,}(?:ine|ene|yne|ate|ite|ide|ium|ol|ose|yl|ein|ase|one)$")
+# 人名/地名里的语助词(al-mandab、el-mandeb、van-gogh)—— 整词跳过大写判定也认不出
+_NAME_PARTICLES = {"al", "el", "de", "la", "le", "van", "von", "der", "den",
+                   "bin", "ibn", "abu", "da", "di", "du", "mac", "mc"}
+
+
+def _looks_like_junk_token(t: str) -> bool:
+    """带连字符的非词汇 token:标题 slug / 化学名 / 人名地名语助词。"""
+    if "-" not in t:
+        return False
+    if _SLUG_RE.match(t) or _CHEM_RE.search(t):
+        return True
+    return t.split("-", 1)[0] in _NAME_PARTICLES
+
 # 不规则词形表 — 这是兜底,避免把"became/built/held/fallen"误判成超纲
 _IRREGULAR = {
     "became": "become", "become": "become",
@@ -217,6 +243,16 @@ _IRREGULAR.update({
 # 常见缩写(非动词缩写形)——列出以免被当生词
 _COMMON_ABBREV = {"approx", "asap", "dept", "govt", "etc", "vs", "eg", "ie", "aka"}
 
+# 抓取残留 —— 正文里混进来的 URL 协议、文档后缀与站点名,它们不是词汇。
+# 抓取侧已尽量清(见 core._filter_junk 丢整条 URL 的段落),这里是兜底:
+# 老页面早已烤进产物,只能靠这份名单把它们摘掉。属有界维护清单,新来源混进
+# 新的站点名时按需追加。
+_FETCH_RESIDUE = {
+    "http", "https", "www", "html", "htm", "amp", "url", "uri", "rss", "pdf",
+    "chinadaily", "cbsnews", "mynytimes", "iimedia", "techcrunch",
+    "robotoilets", "pathdoc", "robinsoncrusoeinlevels",
+}
+
 # 常见构词前缀 / 后缀 —— 去掉后若落在白名单内,即视为"已知词的派生",不标超纲
 _PREFIXES = ("un", "in", "im", "il", "ir", "dis", "non", "re", "pre", "post",
              "over", "under", "super", "sub", "inter", "trans", "anti", "multi",
@@ -317,6 +353,17 @@ def _lemmas(t: str) -> list[str]:
     # -oes → -o(tomatoes/potatoes/heroes/volcanoes/echoes)
     if s.endswith("oes") and len(s) > 4:
         add_irregular(s[:-2])
+    # 名词性 -ity → 形容词:creativity→creative、electricity→electric
+    if s.endswith("ity") and len(s) > 5:
+        add_irregular(s[:-3])
+        add_irregular(s[:-3] + "e")
+    # -ility → -le:reliability→reliable、controllability→controllable、accessibility→accessible
+    if s.endswith("lity") and len(s) > 6:
+        add_irregular(s[:-5] + "le")
+    # 动词 -en → 词干:deepen→deep、widen→wide、strengthen→strength、worsen→worse
+    if s.endswith("en") and len(s) > 4:
+        add_irregular(s[:-2])
+        add_irregular(s[:-1])
     # 副词派生:basically→basic、possibly→possible、simply→simple
     if s.endswith("ally") and len(s) > 5:
         add_irregular(s[:-4])          # basically → basic / specifically → specific
@@ -347,15 +394,23 @@ def _lemmas(t: str) -> list[str]:
             break
         for c in nxt:
             add_irregular(c)
+            # 去后缀后补回词尾 e:measur→measure、revers→reverse、achiev→achieve
+            add_irregular(c + "e")
+            # 去双写辅音:controll→control(stopp→stop 等已由上面的规则覆盖)
+            if len(c) > 3 and c[-1] == c[-2] and c[-1] not in "aeiou":
+                add_irregular(c[:-1])
         queue = nxt
     return out
 
 
 def _known_compound(w: str, vocab: set[str]) -> bool:
-    """w 能否拆成两个都在白名单里的词(dataset = data+set、newsroom = news+room)。"""
+    """w 能否拆成两个都在白名单里的词(dataset = data+set、newsroom = news+room)。
+
+    切点从 2 起:末段允许两字母(startup = start+up、checkup、breakout)。
+    """
     if len(w) < 7:
         return False
-    for i in range(3, len(w) - 2):
+    for i in range(2, len(w) - 1):
         if w[:i] in vocab and w[i:] in vocab:
             return True
     return False
@@ -462,7 +517,7 @@ def find_out_of_scope_words(text: str,
     这些就是"超纲词",前端会标红。
     """
     vocab = set(whitelist) if whitelist is not None else WHITELIST
-    text = _normalize_quotes(text)
+    text = _URL_RE.sub(" ", _normalize_quotes(text))
     counts: dict[str, int] = {}
     for m in _WORD_RE.findall(text):
         t = m.lower()
@@ -473,6 +528,10 @@ def find_out_of_scope_words(text: str,
         if t in _COMMON_PROPER_HINTS:
             continue
         if t in _COMMON_ABBREV:
+            continue
+        if t in _FETCH_RESIDUE:
+            continue
+        if _looks_like_junk_token(t):
             continue
         # 原型在白名单 → 不标
         if t in vocab:
@@ -494,3 +553,24 @@ def find_out_of_scope_words(text: str,
 
     items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     return [w for w, _ in items[:limit]]
+
+
+def text_tokens(text: str) -> set[str]:
+    """正文经当前分词(先剥 URL、归一引号)后会切出的词元集合(小写)。
+
+    老页面里烤进去的生词是旧代码算的:URL 片段(https、chinadaily)和撇号被截断的
+    doesn/aren,现在的分词根本不会切出它们。判断"某个已烤入的词现在还该不该留"
+    时,拿这个集合做比对比孤立判词准。
+    """
+    return {t.lower() for t in _WORD_RE.findall(_URL_RE.sub(" ", _normalize_quotes(text)))}
+
+
+def is_truncated_contraction(token: str) -> bool:
+    """旧分词不认弯引号(doesn’t → doesn)留下的残缺形。
+
+    补回 "'t" 后若落在白名单里(doesn→do、aren→are、didn→did),就说明它是被切碎的
+    缩写而非生词。方向偏"少标",不会误伤 —— 真生词补 "'t" 后仍是生词。
+    """
+    if len(token) < 4 or not token.endswith("n"):
+        return False
+    return not find_out_of_scope_words(token + "'t", limit=1)
