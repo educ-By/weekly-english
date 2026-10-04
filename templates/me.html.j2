@@ -24,6 +24,19 @@
     <div class="cover-meta" id="me-meta"></div>
   </section>
 
+  <form class="me-name" id="me-name" hidden autocomplete="off">
+    <label class="auth-row">
+      <span>Display name</span>
+      <input type="text" name="display_name" maxlength="24"
+             placeholder="How should we call you?" autocomplete="nickname" />
+    </label>
+    <div class="me-name-actions">
+      <button class="btn me-name-save" type="submit">Save</button>
+      <button class="btn" type="button" data-cancel-name>Cancel</button>
+      <p class="auth-help" id="me-name-help"></p>
+    </div>
+  </form>
+
   <section class="me-stats" id="me-stats" hidden></section>
 
   <div id="me-content">
@@ -33,13 +46,8 @@
     </section>
 
     <section class="me-section">
-      <h2 class="me-h2" id="me-progress-h2">Reading progress</h2>
-      <div class="me-slot" id="me-progress"><p class="me-empty">Loading your progress…</p></div>
-    </section>
-
-    <section class="me-section">
-      <h2 class="me-h2" id="me-history-h2">Reading history</h2>
-      <div class="me-slot" id="me-history"><p class="me-empty">Loading your history…</p></div>
+      <h2 class="me-h2" id="me-reading-h2">Reading</h2>
+      <div class="me-slot" id="me-reading"><p class="me-empty">Loading what you have read…</p></div>
     </section>
   </div>
 

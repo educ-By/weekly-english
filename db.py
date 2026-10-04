@@ -17,11 +17,14 @@ from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import (
-    create_engine, Column, Integer, String, DateTime,
+    create_engine, Column, Integer, String, DateTime, inspect, text,
     Float, ForeignKey, UniqueConstraint, Index, Text, Boolean
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from sqlalchemy.pool import StaticPool
+
+import logging
+log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SQLITE = f"sqlite:///{ROOT / 'data' / 'app.db'}"
@@ -36,6 +39,10 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # 昵称 = 显示名。邮箱仍是身份,昵称只影响页面上怎么称呼你;
+    # 留空则各处回退显示邮箱。
+    display_name = Column(String(24), nullable=False, default="",
+                          server_default="")
 
     history = relationship("ReadingHistory", back_populates="user",
                            cascade="all, delete-orphan")
@@ -220,8 +227,35 @@ def get_session_local():
     return _SessionLocal
 
 
+# create_all 只建"缺的表",绝不会给已有的表补列。所以往老库里加字段必须自己 ALTER,
+# 而且得幂等 —— 本地 SQLite 和线上 Neon Postgres 都要照顾到。
+_ADDED_COLUMNS: dict[str, str] = {
+    "display_name": "ALTER TABLE users ADD COLUMN display_name VARCHAR(24) NOT NULL DEFAULT ''",
+}
+
+
+def _ensure_columns() -> None:
+    engine = get_engine()
+    try:
+        insp = inspect(engine)
+        if "users" not in insp.get_table_names():
+            return
+        existing = {c["name"] for c in insp.get_columns("users")}
+        missing = {k: v for k, v in _ADDED_COLUMNS.items() if k not in existing}
+        if not missing:
+            return
+        with engine.begin() as conn:
+            for name, ddl in missing.items():
+                conn.execute(text(ddl))
+                log.info("Schema: added column users.%s", name)
+    except Exception as e:
+        # 加列失败不该让服务起不来 —— 读取时对缺失字段一律走 .get() 兜底
+        log.warning("Schema check for users failed: %s", e)
+
+
 def init_db():
     Base.metadata.create_all(get_engine())
+    _ensure_columns()
 
 
 def get_db():

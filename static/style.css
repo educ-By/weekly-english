@@ -1267,6 +1267,33 @@ a.vocab-word:hover { color: var(--c-rare); }
   font-size: 12px; color: var(--muted); letter-spacing: 0.04em;
 }
 
+/* 阅读行比进度行多一列"最近阅读时间" */
+.reading-row { grid-template-columns: 96px 1fr 56px 64px 92px 84px; }
+.reading-when { font-variant-numeric: tabular-nums; }
+
+/* 昵称编辑:头部里做成看起来像链接的按钮 */
+.linklike {
+  background: none; border: 0; padding: 0;
+  font: inherit; cursor: pointer;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.linklike:hover { color: var(--accent); border-color: var(--accent); }
+
+.me-name {
+  margin: 26px 0 0;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-2);
+  max-width: 460px;
+}
+.me-name .auth-row { margin-bottom: 12px; }
+.me-name-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.me-name-actions .auth-help { margin: 0; }
+
 /* ---------- 页脚:站点地图 ---------- */
 .foot {
   margin: 64px 0 40px;
@@ -1306,9 +1333,12 @@ a.vocab-word:hover { color: var(--c-rare); }
   .foot .wrap.foot-grid { grid-template-columns: 1fr 1fr; }
   .foot-about { grid-column: 1 / -1; }
   .me-stats { grid-template-columns: 1fr 1fr; }
-  /* 窄屏进度行:只留标题 + 百分比 + 状态,期号与时长让位 */
-  .progress-item { grid-template-columns: 1fr auto auto; }
+  /* 窄屏阅读行:只留标题 + 百分比 + 状态,期号/时长/日期让位 */
+  .progress-item,
+  .reading-row { grid-template-columns: 1fr auto auto; }
   .progress-item .progress-issue,
-  .progress-item .progress-time { display: none; }
+  .progress-item .progress-time,
+  .reading-row .progress-issue,
+  .reading-row .progress-time { display: none; }
   .history-row { grid-template-columns: 1fr auto; }
 }

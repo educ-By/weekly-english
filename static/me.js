@@ -1,4 +1,4 @@
-/* me.js — 个人页:填充 生词本 / 阅读进度 / 阅读历史 三个区块 */
+/* me.js — 个人页:昵称 / 生词本 / 阅读(进度 + 历史合并成一栏)/ 学习概览 */
 (() => {
   const token = localStorage.getItem("we_token");
   if (!token) {
@@ -7,6 +7,8 @@
   }
   const headers = { "Authorization": "Bearer " + token };
 
+  let me = null;   // 当前用户;改完昵称要重画头部和顶栏
+
   const articleHref = (issueKey, articleId) =>
     `/issue/${encodeURIComponent(issueKey)}/article-${encodeURIComponent(articleId)}.html`;
 
@@ -14,22 +16,97 @@
     const el = document.getElementById(id);
     if (el) el.textContent = text;
   }
-
   function slot(id) {
     return document.getElementById(id);
   }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
+  }
 
+  /* ---------------- 头部 + 昵称 ---------------- */
+  function renderHeader() {
+    const title = document.getElementById("me-title");
+    const meta = document.getElementById("me-meta");
+    const nick = (me.display_name || "").trim();
+    if (!title || !meta) return;
+
+    // 标题优先显示昵称;没设过就还是邮箱
+    title.textContent = nick || me.email;
+
+    const parts = [];
+    // 只在用了昵称时才附带邮箱,否则标题那行已经就是邮箱,会重复
+    if (nick) parts.push(`<span>${escape(me.email)}</span>`);
+    parts.push(`<span>Member since ${fmtDate(me.created_at)}</span>`);
+    parts.push(`<button class="linklike" type="button" id="me-edit-name">`
+             + `${nick ? "Edit name" : "Add a name"}</button>`);
+    parts.push(`<a class="nav-link" href="/auth/logout">Sign out</a>`);
+    meta.innerHTML = parts.join('<span class="dot"></span>');
+
+    const edit = document.getElementById("me-edit-name");
+    if (edit) edit.addEventListener("click", openNameForm);
+  }
+
+  // 注意:/me 页不加载 app.js,顶栏那个 nav-item 是本页的"当前区块"标识
+  // (模板写死 "My learning"),不该被昵称顶掉 —— 所以这里不碰它。
+  // 其它页面由 app.js 的 bindAccountLink 负责显示昵称。
+
+  function openNameForm() {
+    const form = document.getElementById("me-name");
+    if (!form) return;
+    form.elements.display_name.value = me.display_name || "";
+    const help = document.getElementById("me-name-help");
+    if (help) help.textContent = "";
+    form.hidden = false;
+    form.elements.display_name.focus();
+    form.elements.display_name.select();
+  }
+
+  function bindNameForm() {
+    const form = document.getElementById("me-name");
+    if (!form) return;
+    const help = document.getElementById("me-name-help");
+    const cancel = form.querySelector("[data-cancel-name]");
+    if (cancel) cancel.addEventListener("click", () => {
+      form.hidden = true;
+      if (help) help.textContent = "";
+    });
+
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = form.querySelector(".me-name-save");
+      const value = form.elements.display_name.value.trim();
+      if (btn) btn.disabled = true;
+      if (help) help.textContent = "";
+      try {
+        const r = await fetch("/api/v1/profile", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ display_name: value }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || "Could not save the name.");
+        if (data.user) me = data.user;
+        renderHeader();
+        form.hidden = true;
+      } catch (err) {
+        if (help) help.textContent = String(err.message || err);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+  }
+
+  /* ---------------- 加载 ---------------- */
   async function load() {
     try {
-      const me = await fetch("/auth/me", { headers }).then(r => {
+      me = await fetch("/auth/me", { headers }).then(r => {
         if (!r.ok) throw new Error("not logged in");
         return r.json();
       });
-      document.getElementById("me-title").textContent = me.email;
-      document.getElementById("me-meta").innerHTML =
-        `<span>Member since ${new Date(me.created_at).toLocaleDateString()}</span>` +
-        `<span class="dot"></span>` +
-        `<a class="nav-link" href="/auth/logout">Sign out</a>`;
+      renderHeader();
+      bindNameForm();
 
       const [vocabData, progData, histData] = await Promise.all([
         fetch("/api/v1/vocab", { headers }).then(r => r.json()).catch(() => ({})),
@@ -37,40 +114,62 @@
         fetch("/api/v1/history", { headers }).then(r => r.json()).catch(() => ({})),
       ]);
       const vocab = vocabData.entries || [];
-      const progress = progData.progress || [];
-      const history = histData.entries || [];
-      renderStats(vocab, progress, history);
+      const rows = mergeReading(progData.progress || [], histData.entries || []);
+      renderStats(vocab, rows);
       renderVocab(vocab);
-      renderProgress(progress);
-      renderHistory(history);
+      renderReading(rows);
     } catch (e) {
       localStorage.clear();
       location.href = "/auth/login";
     }
   }
 
-  // 打开过多少次都算同一篇 —— 和「阅读历史」的去重口径保持一致
-  function distinctArticles(entries) {
-    const seen = new Set();
-    entries.forEach(e => seen.add(`${e.issue_key}|${e.article_id}`));
-    return seen.size;
+  /* ---------------- 阅读:进度 + 历史合并 ---------------- */
+  // 两栏原本内容几乎一样(都是"我读过的文章"),所以并成一栏:
+  // 进度贡献 百分比/时长/完成度,历史贡献 标题兜底 与 最近打开时间,按 (期号, 文章) 合并。
+  function mergeReading(progress, history) {
+    const byKey = new Map();
+    const keyOf = x => `${x.issue_key}|${x.article_id}`;
+    const at = x => x || { issue_key: "", article_id: "" };
+
+    history.forEach(h => {
+      const k = keyOf(h);
+      const row = byKey.get(k) || at(h);
+      if (!row.lastOpened) row.lastOpened = h.opened_at;   // 历史按时间倒序,首条即最近
+      if (!row.title) row.title = h.title || "";
+      byKey.set(k, row);
+    });
+
+    progress.forEach(p => {
+      const k = keyOf(p);
+      const row = byKey.get(k) || at(p);
+      row.title = p.title || row.title || "";
+      row.pct = p.scroll_pct;
+      row.seconds = p.seconds_read || 0;
+      row.completed = p.completed;
+      row.updated_at = p.updated_at;
+      byKey.set(k, row);
+    });
+
+    return Array.from(byKey.values())
+      .map(r => { r.sortKey = r.updated_at || r.lastOpened || ""; return r; })
+      .sort((a, b) => String(b.sortKey).localeCompare(String(a.sortKey)));
   }
 
-  function renderStats(vocab, progress, history) {
+  function renderStats(vocab, rows) {
     const box = slot("me-stats");
     if (!box) return;
-    const opened = distinctArticles(history);
-    const completed = progress.filter(p => p.completed).length;
-    const minutes = Math.round(progress.reduce((s, p) => s + (p.seconds_read || 0), 0) / 60);
+    const completed = rows.filter(r => r.completed).length;
+    const minutes = Math.round(rows.reduce((s, r) => s + (r.seconds || 0), 0) / 60);
 
     // 全新账户给一排 0 没有意义,不如不显示这块
-    if (!progress.length && !vocab.length && !opened) {
+    if (!rows.length && !vocab.length) {
       box.hidden = true;
       return;
     }
 
     const cells = [
-      [progress.length, progress.length === 1 ? "article in progress" : "articles in progress"],
+      [rows.length, rows.length === 1 ? "article read" : "articles read"],
       [completed, "completed"],
       [minutes, minutes === 1 ? "minute read" : "minutes read"],
       [vocab.length, vocab.length === 1 ? "word saved" : "words saved"],
@@ -82,6 +181,39 @@
     box.hidden = false;
   }
 
+  function renderReading(rows) {
+    setH2("me-reading-h2", `Reading · ${rows.length} article${rows.length === 1 ? "" : "s"}`);
+    const box = slot("me-reading");
+    if (!box) return;
+    if (!rows.length) {
+      box.innerHTML = `<p class="me-empty">Nothing yet. Open any article while signed in
+        and it will show up here with how far you got.</p>`;
+      return;
+    }
+    const list = document.createElement("div");
+    list.className = "progress-list";
+    rows.forEach(r => {
+      const item = document.createElement("a");
+      item.className = "progress-row reading-row";
+      item.href = articleHref(r.issue_key, r.article_id);
+      // 只在历史里出现过的文章(打开但还没读满时长)没有进度数据,给破折号而不是 0%
+      const tracked = typeof r.pct === "number";
+      const mins = tracked ? Math.round((r.seconds || 0) / 60) : null;
+      item.innerHTML = `
+        <span class="progress-issue">${escape(r.issue_key)}</span>
+        <span class="progress-title" title="${escape(r.title || r.article_id)}">${escape(r.title || r.article_id)}</span>
+        <span class="progress-pct">${tracked ? Math.round(r.pct) + "%" : "—"}</span>
+        <span class="progress-time">${mins === null ? "—" : mins + " min"}</span>
+        <span class="progress-state">${tracked ? (r.completed ? "Completed" : "In progress") : "Opened"}</span>
+        <span class="progress-time reading-when">${escape(fmtDate(r.sortKey))}</span>
+      `;
+      list.appendChild(item);
+    });
+    box.innerHTML = "";
+    box.appendChild(list);
+  }
+
+  /* ---------------- 生词本 ---------------- */
   function renderVocab(entries) {
     setH2("me-vocab-h2", `My vocabulary · ${entries.length} words`);
     const box = slot("me-vocab");
@@ -117,75 +249,6 @@
         b.closest(".vocab-card").remove();
       });
     });
-  }
-
-  function renderProgress(rows) {
-    setH2("me-progress-h2", `Reading progress · ${rows.length} articles`);
-    const box = slot("me-progress");
-    if (!box) return;
-    if (!rows.length) {
-      box.innerHTML = `<p class="me-empty">No reading data yet. Open any article while
-        signed in and your progress will show up here.</p>`;
-      return;
-    }
-    const list = document.createElement("div");
-    list.className = "progress-list";
-    rows.slice().sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))
-      .forEach(p => {
-        const item = document.createElement("a");
-        item.className = "progress-row progress-item";
-        item.href = articleHref(p.issue_key, p.article_id);
-        const mins = Math.round((p.seconds_read || 0) / 60);
-        // 标题由后端从 catalog 补上(进度表里没存)。没有标题就退回期号,
-        // 免得整行空着看不出是哪一篇。
-        const title = p.title || p.article_id;
-        item.innerHTML = `
-          <span class="progress-issue">${escape(p.issue_key)}</span>
-          <span class="progress-title" title="${escape(title)}">${escape(title)}</span>
-          <span class="progress-pct">${Math.round(p.scroll_pct || 0)}%</span>
-          <span class="progress-time">${mins} min</span>
-          <span class="progress-state">${p.completed ? "Completed" : "In progress"}</span>
-        `;
-        list.appendChild(item);
-      });
-    box.innerHTML = "";
-    box.appendChild(list);
-  }
-
-  function renderHistory(entries) {
-    // 每打开一次就写一行 —— 按文章去重,只留最近一次
-    const seen = new Set();
-    const rows = [];
-    entries.forEach(e => {
-      const k = `${e.issue_key}|${e.article_id}`;
-      if (seen.has(k)) return;
-      seen.add(k);
-      rows.push(e);
-    });
-
-    setH2("me-history-h2", `Reading history · ${rows.length} articles`);
-    const box = slot("me-history");
-    if (!box) return;
-    if (!rows.length) {
-      box.innerHTML = `<p class="me-empty">Nothing opened yet.</p>`;
-      return;
-    }
-    const list = document.createElement("div");
-    list.className = "progress-list";
-    rows.forEach(e => {
-      const item = document.createElement("a");
-      item.className = "progress-row history-row";
-      item.href = articleHref(e.issue_key, e.article_id);
-      const when = e.opened_at ? new Date(e.opened_at).toLocaleDateString() : "";
-      item.innerHTML = `
-        <span class="progress-issue">${escape(e.issue_key)}</span>
-        <span class="history-title">${escape(e.title || "(untitled)")}</span>
-        <span class="progress-time">${escape(when)}</span>
-      `;
-      list.appendChild(item);
-    });
-    box.innerHTML = "";
-    box.appendChild(list);
   }
 
   function escape(s) {

@@ -89,6 +89,8 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
     created_at: dt.datetime
+    # 昵称(显示名)。空串 = 没设过,前端回退显示 email
+    display_name: str = ""
 
     class Config:
         from_attributes = True

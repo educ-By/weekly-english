@@ -1086,7 +1086,8 @@
           link.textContent = "Sign in";
           link.href = "/auth/login";
         } else {
-          link.textContent = u.email;
+          // 设过昵称就用昵称,否则还是邮箱
+          link.textContent = u.display_name || u.email;
           link.href = "/me";
         }
       })

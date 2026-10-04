@@ -712,6 +712,28 @@ def list_progress(sess: Session = Depends(db.get_db),
     return {"progress": out}
 
 
+MAX_DISPLAY_NAME = 24
+
+
+@app.post("/api/v1/profile")
+def update_profile(payload: dict,
+                   sess: Session = Depends(db.get_db),
+                   user: db.User = Depends(auth.require_user)):
+    """改昵称(显示名)。邮箱是身份,改不了;昵称只影响页面上怎么称呼你。"""
+    raw = (payload.get("display_name") or "").strip()
+    if len(raw) > MAX_DISPLAY_NAME:
+        raise HTTPException(400, f"昵称最多 {MAX_DISPLAY_NAME} 个字符。")
+    if any(ch in raw for ch in "\r\n\t"):
+        raise HTTPException(400, "昵称不能包含换行。")
+    row = sess.query(db.User).filter_by(id=user.id).first()
+    if not row:
+        raise HTTPException(404, "User not found")
+    row.display_name = raw            # 传空串即清空,前端会回退显示邮箱
+    sess.commit()
+    sess.refresh(row)
+    return {"ok": True, "user": auth.UserOut.model_validate(row).model_dump()}
+
+
 @app.get("/api/v1/history")
 def list_history(limit: int = Query(60, ge=1, le=500),
                  sess: Session = Depends(db.get_db),
