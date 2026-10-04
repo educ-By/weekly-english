@@ -11,3 +11,5 @@ README.backup.md
 gh_probe.json
 hp.html
 data/app.db
+data/*.log
+.zcode/
