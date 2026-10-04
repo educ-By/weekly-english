@@ -124,9 +124,8 @@ python -m uvicorn server.main:app --host 127.0.0.1 --port 8000
 | --- | --- | --- |
 | `/api/issues` | GET | JSON:全部期号列表 |
 | `/api/dict?word=X&sentence=Y` | GET | 查词:离线词典 + 机翻,**不调 AI**(返回 JSON) |
-| `/api/ask` | POST | 提问 DeepSeek,自动带上下文 |
+| `/api/ask` | POST | 提问 DeepSeek,自动带上下文(**需 Bearer token**) |
 | `/api/v1/vocab`·`/api/v1/progress`·`/api/v1/history` | GET/POST/DELETE | 生词本 / 阅读进度 / 阅读历史(需 Bearer token) |
-| `/api/admin/refresh` | POST | 手动触发本周抓取 |
 | `/healthz` | GET | 健康检查(Render 用) |
 
 跨期页面(`/level`、`/search`、首页)读的是渲染期产出的索引:每期目录下有
@@ -260,11 +259,7 @@ BBC Learning English*
 ## 自动化
 
 - **APScheduler**:每周一 07:00(Asia/Shanghai)自动 `core.full_refresh()`
-- **手动触发**: `curl -X POST https://your-app.onrender.com/api/admin/refresh`
-- **本地 cron**:
-  ```cron
-  0 7 * * 1 cd /path/to/weekly-english && curl -X POST http://localhost:8000/api/admin/refresh
-  ```
+- **手动触发**: 手动刷新接口已下线(任何人可调会白烧 AI token)。需要立即刷新时在容器内执行 `python -c "import core; core.full_refresh(core.Path('data/output'))"`,或等每周一 07:00 的定时任务。
 
 ---
 
@@ -274,9 +269,9 @@ BBC Learning English*
 | --- | --- | --- |
 | `/` 卡死 | 首次抓 RSS 时网络慢 | 等待 ~30s,会自动完成;后台线程不阻塞 |
 | `/api/dict` 查不到词 | 离线词典没有且 MyMemory 不可达 | 查词不依赖 `DEEPSEEK_API_KEY`;确认 `data/dict/ecdict.csv.gz` 在卷上(缺失时启动会从镜像种子补) |
-| 主页空白 | 首次启动,后台抓取未完成 | 刷新几次或访问 `/api/admin/refresh` |
+| 主页空白 | 首次启动,后台抓取未完成 | 刷新几次,启动时的后台线程会自动补抓 |
 | APScheduler 不跑 | Render sleep | 正常,首次访问会触发 startup 重抓 |
-| RSS 抓不到 | 站点临时屏蔽 | 检查 `/api/admin/refresh` 响应,临时在配置里移除失败源 |
+| RSS 抓不到 | 站点临时屏蔽 | 看服务日志里的 `source failed` 行,临时在配置里移除失败源 |
 
 ---
 

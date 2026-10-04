@@ -4,7 +4,6 @@ FastAPI 主程序 — Weekly English 后端服务
   - /api/dict?word=x:查词(离线 ECDICT + MyMemory 机翻,不调 AI)
   - /api/ask:对 DeepSeek 提问,自动限制到本周文章
   - /api/issues:列出全部期数(给前端 SPA 或小部件用)
-  - /api/admin/refresh:手动触发本周抓取
   - /healthz:健康检查
   - APScheduler:每周一 07:00 自动刷新
 """
@@ -13,7 +12,9 @@ import json
 import logging
 import os
 import threading
+import time
 import re
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -40,10 +41,13 @@ OUT_DIR = ROOT / "data" / "output"
 STATIC_DIR = ROOT / "static"
 
 # ---------------- 模板 ----------------
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+# autoescape 必须显式开:模板后缀是 .html.j2,select_autoescape(["html"]) 对它
+# 返回 False,曾经造成用户输入(搜索词)不转义直出 —— 反射型 XSS。
+# 模板变量全是标量,无 HTML 内容输出;既有的 |e 与 autoescape 不冲突。
+from jinja2 import Environment, FileSystemLoader
 _TPL_ENV = Environment(
     loader=FileSystemLoader(str(ROOT / "templates")),
-    autoescape=select_autoescape(["html"]),
+    autoescape=True,
     trim_blocks=True, lstrip_blocks=True,
 )
 _TPL_ENV.globals["asset"] = core.asset
@@ -86,7 +90,8 @@ def _ensure_cefr_seed() -> None:
     import shutil
     dst = OUT_DIR.parent / "cefr_vocab"
     if not _CEFR_SEED.exists():
-        log.warning("cefr_vocab missing and no seed found at %s", dst)
+        # 非 Docker 环境没有镜像种子,属正常;卷上的词表以现状为准
+        log.info("No cefr seed in image (normal outside Docker); keeping %s as-is", dst)
         return
     dst.mkdir(parents=True, exist_ok=True)
     copied = []
@@ -160,14 +165,29 @@ def _ensure_data_seed():
     _ensure_issues_seed()
 
 
-@app.on_event("startup")
-def _init_db():
+# ---------- lifespan:启动收尾 + 关停 ----------
+# 取代三个 @app.on_event("startup")(新 FastAPI 已弃用 on_event)。
+# lifespan 里引用的 scheduler / _background_refresh_once 定义在本文件后部 ——
+# 函数体在服务真正启动时才执行,届时整个模块早已加载完。
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
     _ensure_data_seed()
     try:
         db.init_db()
         log.info("DB initialized: %s", db.get_database_url().split("://")[0])
     except Exception as e:
         log.warning("DB init failed: %s", e)
+    if not scheduler.running:
+        scheduler.start()
+    # 初始刷新放后台线程,不阻塞启动;失败用户在其他页面才会触发
+    threading.Thread(target=_background_refresh_once,
+                     name="initial-refresh", daemon=True).start()
+    yield
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="Weekly English", version="1.0.0", lifespan=lifespan)
 
 
 # ---------- 主页 / 精读页 / archive ----------
@@ -197,6 +217,9 @@ def _cached_text(path: Path) -> Optional[tuple[str, str]]:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
+    # 每条 ~200KB 文本,不设上限的话期数累积后内存会一直涨
+    if len(_file_cache) > 256:
+        _file_cache.clear()
     _file_cache[str(path)] = (stamp, text)
     return text, etag
 
@@ -218,6 +241,21 @@ def _html_response(path: Path, request: Request) -> Response:
     return _file_response(path, request, "text/html; charset=utf-8")
 
 
+# 首访兜底抓取的锁 —— 并发首访只触发一次,防重复全站抓取(烧 AI 摘要 token)
+_refresh_lock = threading.Lock()
+
+
+def _kick_full_refresh():
+    if not _refresh_lock.acquire(blocking=False):
+        return
+    try:
+        core.full_refresh(OUT_DIR)
+    except Exception as e:
+        log.warning("Background initial refresh failed: %s", e)
+    finally:
+        _refresh_lock.release()
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     """首页门户 —— 独立于最新一期的 /issue/{key}。"""
@@ -228,17 +266,16 @@ def index(request: Request):
         if issues:
             core.write_index_landing(OUT_DIR, issues)
     if not path.exists():
-        # 一期都还没有 —— 自动触发一次抓取
-        log.info("No issue found, triggering refresh...")
-        result = core.full_refresh(OUT_DIR)
-        if not result.get("ok"):
-            return HTMLResponse(
-                "<h1>Weekly English</h1>"
-                "<p>No articles collected yet. Check your RSS sources and network.</p>",
-                status_code=503,
-            )
-    if not path.exists():
-        raise HTTPException(404, "Home page missing.")
+        # 一期都还没有 —— 后台补抓,立刻返回提示页。同步抓全程要几分钟,
+        # 会把首访请求(以及它占住的线程池线程)挂住;并发首访由锁去重。
+        threading.Thread(target=_kick_full_refresh, name="kick-refresh",
+                         daemon=True).start()
+        return HTMLResponse(
+            "<h1>Weekly English</h1>"
+            "<p>No articles collected yet. The first fetch is running in the "
+            "background — please refresh in a minute.</p>",
+            status_code=503,
+        )
     return _html_response(path, request)
 
 
@@ -280,7 +317,7 @@ def article_under_issue_prefix(article_id: str, request: Request):
 def issue_prefix_static(file_path: str):
     """/issue/article-x.html 页的相对静态资源解析到 /issue/static/... — 用主静态目录伺服。"""
     candidate = (STATIC_DIR / file_path).resolve()
-    if not str(candidate).startswith(str(STATIC_DIR.resolve())) or not candidate.is_file():
+    if not candidate.is_relative_to(STATIC_DIR.resolve()) or not candidate.is_file():
         raise HTTPException(404, "Not Found")
     return FileResponse(candidate)
 
@@ -429,6 +466,9 @@ def _issue_corpus(issue_key: str) -> dict:
     except Exception as e:
         log.warning("Bad search.json for %s: %s", issue_key, e)
         data = {}
+    # 一期语料 ~150KB;上限防期数累积后内存一直涨
+    if len(_CORPUS_CACHE) > 64:
+        _CORPUS_CACHE.clear()
     _CORPUS_CACHE[issue_key] = (mtime, data)
     return data
 
@@ -466,8 +506,8 @@ def api_issues():
     return {"issues": core.scan_issues(OUT_DIR)}
 
 
-# ---------- AI 月度配额(每模型各 50 万 tokens;开发者账户不限) ----------
-AI_MONTHLY_TOKEN_LIMIT = int(os.environ.get("AI_MONTHLY_TOKEN_LIMIT", "500000"))
+# ---------- AI 月度配额(每模型 20 万 tokens;开发者账户不限) ----------
+AI_MONTHLY_TOKEN_LIMIT = int(os.environ.get("AI_MONTHLY_TOKEN_LIMIT", "200000"))
 DEVELOPER_EMAIL = os.environ.get("DEVELOPER_EMAIL", "1607045457@qq.com")
 
 
@@ -492,8 +532,10 @@ def _quota_exceeded(provider: str, request: Request | None = None) -> bool:
         return False   # 开发者账户无视限制
     try:
         return db.get_month_usage(provider) >= AI_MONTHLY_TOKEN_LIMIT
-    except Exception:
-        return False
+    except Exception as e:
+        # 失败关闭:查不到用量就拒绝。放行等于配额失效,烧的是全局共享池。
+        log.error("quota check failed for %s — refusing AI call: %s", provider, e)
+        return True
 
 
 def _record_usage(provider: str, tokens: int, request: Request | None = None):
@@ -505,8 +547,14 @@ def _record_usage(provider: str, tokens: int, request: Request | None = None):
         log.warning("usage record failed: %s", e)
 
 
+# 查词负缓存 —— 查不到的词短 TTL 内不重查:MyMemory 兜底一次超时 6s,
+# 生僻词被反复点开时不能每次都慢一遍。只缓存失败,成功的走共享库。
+_NEG_GLOSS_TTL = 600.0
+_neg_gloss: dict[str, float] = {}
+
+
 @app.get("/api/dict")
-def api_dict(word: str = Query(..., min_length=1),
+def api_dict(word: str = Query(..., min_length=1, max_length=64),
              sentence: str | None = Query(None)):
     """单词速查 —— 全链路不调 AI:共享缓存 → 离线 ECDICT → MyMemory 免费机翻。
 
@@ -518,6 +566,9 @@ def api_dict(word: str = Query(..., min_length=1),
         raise HTTPException(400, "word is required")
     ctx = (sentence or "").strip()[:160]
     ck = f"{word}|{ctx}"
+    now = time.time()
+    if _neg_gloss.get(ck, 0) > now:
+        return {"ok": False, "word": word, "translation": ""}
     try:
         shared = db.get_shared_gloss(ck)
         if shared:
@@ -532,21 +583,28 @@ def api_dict(word: str = Query(..., min_length=1),
 
     info = dict_client.lookup(word)
     if info.get("ok") and info.get("translation"):
+        _neg_gloss.pop(ck, None)
         try:
             db.save_shared_gloss(ck, word, info, model=info.get("model") or "")
         except Exception as e:
             log.warning("shared gloss save failed: %s", e)
+    else:
+        if len(_neg_gloss) > 2000:
+            _neg_gloss.clear()
+        _neg_gloss[ck] = now + _NEG_GLOSS_TTL
     return info
 
 
 class AskIn(BaseModel):
     question: str = ""
     issue_key: str | None = None
+    article_id: str | None = None
 
 
 @app.post("/api/ask")
-def api_ask(payload: AskIn, request: Request):
-    """用户提问(严格限制到本周文章 + 英语学习)。
+def api_ask(payload: AskIn, request: Request,
+            user: db.User = Depends(auth.require_user)):
+    """用户提问(需登录;严格限制到本周文章 + 英语学习)。
 
     注意这里必须是同步 def。里面的 deepseek_client.ask 是阻塞式的 HTTP 调用,
     写在 async def 里会把事件循环占住 —— 单 worker 部署下,只要有一个人在提问,
@@ -559,17 +617,13 @@ def api_ask(payload: AskIn, request: Request):
     if _quota_exceeded("deepseek", request):
         return {"ok": False, "refused": False, "content": "本月 AI 额度已用完,下月自动恢复。"}
     issue_key = payload.issue_key or _latest_issue_key()
+    focus = (_load_focus_article(payload.article_id, issue_key)
+             if (issue_key and payload.article_id) else None)
     articles = _load_articles_context(issue_key) if issue_key else []
-    info = deepseek_client.ask(question, context_articles=articles)
+    info = deepseek_client.ask(question, context_articles=articles,
+                               focus_article=focus)
     _record_usage("deepseek", info.get("usage_tokens") or 0, request)
     return info
-
-
-@app.post("/api/admin/refresh")
-def manual_refresh():
-    """手动触发一次完整刷新 — 用于首次启动或调试。"""
-    result = core.full_refresh(OUT_DIR)
-    return result
 
 
 @app.get("/healthz")
@@ -579,6 +633,7 @@ def health():
         "deepseek_configured": deepseek_client.is_configured(),
         "latest_issue": _latest_issue_key(),
         "db": db.get_database_url().split("://")[0],
+        "jwt_secret_configured": auth.JWT_SECRET != "dev-only-secret-change-in-prod",
     }
 
 
@@ -670,8 +725,13 @@ def report_progress(payload: dict,
     """前端每 ~10 秒上报阅读时长 + 滚动百分比。"""
     issue_key = (payload.get("issue_key") or "").strip()
     article_id = (payload.get("article_id") or "").strip()
-    seconds = max(0, int(payload.get("seconds") or 0))
-    scroll = max(0.0, min(100.0, float(payload.get("scroll_pct") or 0)))
+    try:
+        seconds = max(0, int(payload.get("seconds") or 0))
+        scroll = max(0.0, min(100.0, float(payload.get("scroll_pct") or 0)))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "seconds and scroll_pct must be numeric")
+    if scroll != scroll:                     # float("nan") 能穿过 min/max
+        scroll = 0.0
     completed = bool(payload.get("completed") or scroll >= 95)
     if not issue_key or not article_id:
         raise HTTPException(400, "issue_key and article_id required")
@@ -832,6 +892,7 @@ def list_history(limit: int = Query(60, ge=1, le=500),
 
 # ---------- 辅助 ----------
 _articles_ctx_cache: dict[str, tuple[float, list[dict]]] = {}
+_CTX_CACHE_MAX = 32          # 条数上限;超限整体清空(每条只是几 KB 的标题清单)
 
 
 def _load_articles_context(issue_key: str) -> list[dict]:
@@ -866,8 +927,46 @@ def _load_articles_context(issue_key: str) -> list[dict]:
             })
         except Exception:
             continue
+    if len(_articles_ctx_cache) > _CTX_CACHE_MAX:
+        _articles_ctx_cache.clear()
     _articles_ctx_cache[issue_key] = (stamp, out)
     return out
+
+
+def _load_focus_article(article_id: str | None,
+                        issue_key: str | None) -> dict | None:
+    """用户正在读的那篇文章:标题/来源/URL + 正文摘录(前 4000 字符)。
+
+    没有正文,模型只看得到标题清单,问"这篇文章里 X 是什么意思"就会被误判成
+    超范围拒答。正文取自该期 search.json 语料(渲染时落盘的全量小写文本),
+    只进 system 消息不落库。article_id 不在指定期里时按 catalog 反查真实归属期
+    —— 前端只从 URL 抠 id,期号传错的场合仍能带上正确正文。
+    """
+    aid = (article_id or "").strip()[:64]
+    if not aid:
+        return None
+    catalog = _catalog()
+    art, key = None, issue_key
+    for it in catalog:                       # 先在指定期里找
+        if it["key"] != key:
+            continue
+        art = next((a for a in it["articles"] if a.get("id") == aid), None)
+        break
+    if art is None:                          # 再全 catalog 反查
+        for it in catalog:
+            found = next((a for a in it["articles"] if a.get("id") == aid), None)
+            if found:
+                key, art = it["key"], found
+                break
+    if art is None:
+        return None
+    body = _issue_corpus(key).get(aid, "")[:4000]
+    return {
+        "title": art.get("title", ""),
+        "source": art.get("source", ""),
+        "url": art.get("url", ""),
+        "body": body,
+    }
 
 
 # ---------- 启动时不阻塞:后台线程做初始抓取 ----------
@@ -927,14 +1026,6 @@ def _background_refresh_once():
             log.warning("Initial refresh failed: %s", e)
 
 
-@app.on_event("startup")
-def _on_startup():
-    # 不阻塞主线程;失败用户在其他页面才会触发
-    threading.Thread(target=_background_refresh_once,
-                     name="initial-refresh",
-                     daemon=True).start()
-
-
 # ---------- 定时调度:每周一 07:00 ----------
 scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
@@ -958,12 +1049,6 @@ scheduler.add_job(
 )
 
 
-@app.on_event("startup")
-def _start_scheduler():
-    if not scheduler.running:
-        scheduler.start()
-
-
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "8000"))
@@ -979,7 +1064,7 @@ def static_pages_fallback(file_path: str):
     if not file_path:
         raise HTTPException(404, "Not Found")
     candidate = (OUT_DIR / file_path).resolve()
-    if not str(candidate).startswith(str(OUT_DIR.resolve())):
+    if not candidate.is_relative_to(OUT_DIR.resolve()):
         raise HTTPException(404, "Not Found")
     if candidate.suffix.lower() not in {".html", ".css", ".js",
                                         ".png", ".jpg", ".jpeg", ".svg", ".ico",

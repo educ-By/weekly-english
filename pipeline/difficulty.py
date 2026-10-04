@@ -13,7 +13,6 @@ CEFR B1/B2/C1 难度评估
 from __future__ import annotations
 import os
 import re
-import csv
 import logging
 from pathlib import Path
 
@@ -29,34 +28,6 @@ _SENT_RE = re.compile(r"[.!?]+\s")
 # 真实词表(带屈折/派生展开):
 _VOCAB_HS: set[str] = _load_whitelist(("highschool_whitelist.txt",))
 _VOCAB_ALL: set[str] = _load_whitelist()   # 高考 + 四六级
-
-# 兼容旧接口
-VOCAB: dict[str, set[str]] = {
-    "b1": _VOCAB_HS,
-    "b2": _VOCAB_ALL,
-    "c1": _VOCAB_ALL,
-}
-
-
-def _load_vocab(level: str) -> set[str]:
-    path = DATA_DIR / f"{level}.csv"
-    if not path.exists():
-        return set()
-    words: set[str] = set()
-    with open(path, "r", encoding="utf-8") as f:
-        for row in csv.reader(f):
-            if not row:
-                continue
-            w = row[0].strip().lower()
-            if w and not w.startswith("#"):
-                words.add(w)
-    return words
-
-
-VOCAB: dict[str, set[str]] = {
-    lvl: _load_vocab(lvl)
-    for lvl in ("b1", "b2", "c1")
-}
 
 
 def _tokenize(text: str) -> list[str]:

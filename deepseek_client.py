@@ -51,7 +51,7 @@ def _cfg(*groups: str) -> dict:
     """按顺序取第一个配置了 API_KEY 的组;每组形如 {G}_API_KEY / {G}_BASE_URL / {G}_MODEL。
     任何 OpenAI ChatCompletions 兼容端点都可用(DeepSeek / 智谱 BigModel / Kimi / 通义 等)。
     例:ask() 用 _cfg("ASK", "DEEPSEEK", "LLM") — 交流优先 DeepSeek;
-        lookup_word() 用 _cfg("LLM", "DEEPSEEK") — 单词优先配置的便宜模型。"""
+        查词已去 AI(见 dict_client),不再有单词 lookup 的模型调用。"""
     for g in groups:
         key = _env(f"{g}_API_KEY")
         if key:
@@ -95,16 +95,19 @@ def ask(question: str,
         context_articles: Iterable[dict] | None = None,
         model: str | None = None,
         max_tokens: int = 900,
-        temperature: float = 0.3) -> dict:
+        temperature: float = 0.3,
+        focus_article: dict | None = None) -> dict:
     """
     调用 DeepSeek-V4.1-Flash 回答用户问题,自动带严格 system guard。
-    context_articles: 用来限定范围 — 模型只允许用这些文章作为上下文。
+    context_articles: 本期文章清单(标题/来源/URL) — 让模型知道这周有什么。
+    focus_article: 用户正在读的那一篇,带正文摘录(前 ~4000 字符) —
+                   没有它,模型只看得到标题,问正文内容会被误判"超范围"。
     返回:{ok, content, refused, model}
 
     DeepSeek 是思考型模型:答案写在 content,推理写在 reasoning_content,而思考
     本身也吃 max_tokens。问题短/开放时偶发"思考把配额耗光"或"答案全写进思考"
     → content 为空,前端就显示 "(no answer)"。兜底:content 空则从
-    reasoning_content 提取结论(与 lookup_word 同款),仍空则放宽 max_tokens 重问。
+    reasoning_content 提取结论,仍空则放宽 max_tokens 重问。
     """
     cfg = _cfg("ASK", "DEEPSEEK", "LLM")
     if not cfg["api_key"]:
@@ -113,8 +116,17 @@ def ask(question: str,
                 "model": DEFAULT_MODEL}
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if focus_article and focus_article.get("body"):
+        messages.append({"role": "system", "content": "\n".join([
+            "The user is currently reading this article (full text, read-only context):",
+            f"Title: {focus_article.get('title', '')}",
+            f"Source: {focus_article.get('source', '')}",
+            f"URL: {focus_article.get('url', '')}",
+            "--- article body ---",
+            focus_article["body"],
+        ])})
     if context_articles:
-        ctx_lines = ["This week's articles (read-only context):"]
+        ctx_lines = ["Other articles in this week's issue (titles only):"]
         for a in context_articles[:6]:
             ctx_lines.append(
                 f"- [{a.get('source','?')}] {a.get('title','')} — "
@@ -210,78 +222,3 @@ def summarize_zh(title: str, body: str, model: str | None = None) -> str:
         log.warning("summarize_zh failed: %s", e)
         return ""
 
-
-_lookup_cache: dict[str, dict] = {}   # (word|ctx) → 释义,进程内缓存省 token
-
-def lookup_word(word: str,
-                sentence_context: str | None = None,
-                model: str | None = None) -> dict:
-    """
-    单词速查:配置的便宜模型,只回短中文释义(取本句意)。
-    prompt/输出都极短,配合进程内缓存,token 消耗最小化。
-    用于 /api/dict?word=x
-    """
-    ctx = (sentence_context or "").strip()[:160]   # 只保留本句,截断省 token
-    ck = f"{word.lower()}|{ctx}"
-    if ck in _lookup_cache:
-        return _lookup_cache[ck]
-
-    cfg = _cfg("LLM", "DEEPSEEK", "ASK")
-    if not cfg["api_key"]:
-        return {"ok": False, "word": word,
-                "translation": "Configure LLM_API_KEY (or DEEPSEEK_API_KEY) to enable the inline dictionary."}
-
-    prompt = (
-        'Word: "' + word + '"\n'
-        + ('Sentence: "' + ctx + '"\n' if ctx else "")
-        + '给出该词在本句中的简洁中文释义。'
-        '只输出一行 JSON:{"phonetic":"英式音标","zh":"本句义,不超过15字","pos":"词性"}'
-    )
-    try:
-        client = _client(cfg, timeout=20.0)   # 单词释义很短,超时就换在线词典退路
-        # 仅智谱端点会注入 thinking 参数;DeepSeek 不发送
-        extra = _thinking_extra(cfg)
-        import json as _json, re as _re
-        data, text = {}, ""
-        for attempt in range(2):
-            resp = client.chat.completions.create(
-                model=model or cfg["model"],
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=800, temperature=0.1,   # 思考型模型需要充足预算
-                **extra,
-            )
-            msg = resp.choices[0].message
-            text = (msg.content or "").strip()
-            if not text:
-                # 思考型模型把内容写进了 reasoning_content — 从中提取 JSON
-                rc = getattr(msg, "reasoning_content", None) or ""
-                m2 = _re.search(r"\{[^{}]*\}", rc, _re.S)
-                text = m2.group(0) if m2 else rc.strip()
-            # 健壮解析:剥掉 markdown 围栏,截取第一个 {...}
-            m = _re.search(r"\{[^{}]*\}", text, _re.S)
-            if m:
-                try:
-                    data = _json.loads(m.group(0))
-                except Exception:
-                    data = {}
-            if isinstance(data, dict) and (data.get("zh") or data.get("translation")):
-                break   # 拿到中文释义,结束
-            data = {}
-        usage = getattr(resp, "usage", None)
-        info = {"ok": True, "word": word,
-                "phonetic": (data.get("phonetic") or "") if isinstance(data, dict) else "",
-                "definition_en": "",
-                "translation": (data.get("zh") or data.get("translation") or text[:60]),
-                "examples": [],
-                "cefr_level": "",
-                "model": cfg["model"],
-                "usage_tokens": getattr(usage, "total_tokens", 0) or 0}
-        if len(_lookup_cache) > 800:
-            _lookup_cache.clear()
-        _lookup_cache[ck] = info
-        return info
-    except Exception as e:
-        log.warning("lookup_word failed: %s", e)
-        # 把真实原因带出去,便于在页面上直接定位(网络/变量/key 问题一眼可见)
-        return {"ok": False, "word": word,
-                "translation": "LLM error: " + str(e)[:120]}

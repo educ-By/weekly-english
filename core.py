@@ -45,7 +45,7 @@ RENDER_MIGRATE_VERSION = 1
 # 所以启动时会用 refresh_asset_versions() 就地重写这些引用;否则老用户
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
-    "app.js": 48,
+    "app.js": 49,
     "style.css": 40,
     "me.js": 4,
     "auth.js": 1,
@@ -433,15 +433,30 @@ DEFAULT_GUARDIAN_SECTIONS = ["world", "technology"]
 
 
 def week_label(today: dt.date | None = None) -> str:
-    today = today or dt.date.today()
+    today = today or _today()
     iso = today.isocalendar()
     return f"{iso.year} · W{iso.week:02d}"
 
 
 def issue_key(today: dt.date | None = None) -> str:
-    today = today or dt.date.today()
+    today = today or _today()
     iso = today.isocalendar()
     return f"{iso.year}-W{iso.week:02d}"
+
+
+# 期号锚定时区 — 固定 Asia/Shanghai,与定时调度(scheduler 的 timezone)一致。
+# 之前用服务器本地日期,容器 TZ=UTC 时周一 0~7 点渲染的期号会归到上一周。
+try:
+    from zoneinfo import ZoneInfo
+    _SCHED_TZ = ZoneInfo("Asia/Shanghai")
+except Exception:
+    _SCHED_TZ = None
+
+
+def _today() -> dt.date:
+    if _SCHED_TZ is not None:
+        return dt.datetime.now(_SCHED_TZ).date()
+    return dt.date.today()
 
 
 def safe_paragraphs(text: str, max_paragraphs: int = 12) -> list[str]:
@@ -567,9 +582,11 @@ ROOT = Path(__file__).resolve().parent
 TEMPLATES_DIR = ROOT / "templates"
 STATIC_DIR = ROOT / "static"
 
+# autoescape 显式开:模板后缀 .html.j2 不被 select_autoescape(["html"]) 认出,
+# 之前等于没转义(标题/简介里的引号会截断属性值)。模板变量全是标量。
 _env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(str(TEMPLATES_DIR)),
-    autoescape=jinja2.select_autoescape(["html"]),
+    autoescape=True,
     trim_blocks=True, lstrip_blocks=True,
 )
 _env.globals["asset"] = asset
@@ -1330,7 +1347,7 @@ def full_refresh(out_dir: Path,
     _apply_zh_summaries(articles)
     key = issue_key()
     week = week_label()
-    number = dt.date.today().isocalendar()[1]
+    number = _today().isocalendar()[1]
     title = issue_title(articles)
     issue_dir = out_dir / key
 

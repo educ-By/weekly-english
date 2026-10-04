@@ -1037,15 +1037,36 @@
       out.hidden = false;
       out.textContent = "Thinking…";
       try {
+        const headers = {"Content-Type": "application/json"};
+        const token = localStorage.getItem("we_token");
+        if (token) headers["Authorization"] = "Bearer " + token;
+        // 文章 id:优先取 <article id="article-xxx">,回退从 URL 抠
+        const aid = article.id.replace(/^article-/, "")
+                   || (location.pathname.match(/article-([A-Za-z0-9_-]+)\.html/) || [])[1]
+                   || "";
         const r = await fetch("/api/ask", {
           method: "POST",
-          headers: {"Content-Type": "application/json"},
+          headers,
           body: JSON.stringify({
             question: q,
             issue_key: (location.pathname.match(/(\d{4}-W\d{2})/) || [])[1]
                        || document.body.dataset.issueKey || "",
+            article_id: aid,
           }),
         });
+        if (r.status === 401) {
+          out.textContent = "";
+          const tip = document.createElement("div");
+          tip.className = "ask-usage";
+          tip.append("Asking requires an account — ");
+          const link = document.createElement("a");
+          link.href = "/auth/login";
+          link.textContent = "sign in";
+          tip.appendChild(link);
+          tip.append(" first.");
+          out.appendChild(tip);
+          return;
+        }
         const data = await r.json();
         // 聊开后:面板保持展开,输出区平滑滚入视野
         const panel = mount.querySelector(".ask-panel");

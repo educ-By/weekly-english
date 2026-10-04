@@ -21,7 +21,6 @@ from sqlalchemy import (
     Float, ForeignKey, UniqueConstraint, Index, Text, Boolean
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from sqlalchemy.pool import StaticPool
 
 import logging
 log = logging.getLogger(__name__)
@@ -136,12 +135,15 @@ def add_usage(provider: str, tokens: int):
     if not tokens:
         return
     month = datetime.utcnow().strftime("%Y-%m")
+    # 单条 upsert 原子累加:读-改-写两步在并发提问下会互相覆盖丢计数。
+    # ON CONFLICT 语法 sqlite 3.24+ 与 postgres 都支持。
     with get_session_local()() as ses:
-        row = ses.query(TokenUsage).filter_by(provider=provider, month=month).first()
-        if row:
-            row.tokens = (row.tokens or 0) + tokens
-        else:
-            ses.add(TokenUsage(provider=provider, month=month, tokens=tokens))
+        ses.execute(text(
+            "INSERT INTO token_usage (provider, month, tokens) "
+            "VALUES (:p, :m, :t) "
+            "ON CONFLICT (provider, month) "
+            "DO UPDATE SET tokens = token_usage.tokens + :t2"
+        ), {"p": provider, "m": month, "t": int(tokens), "t2": int(tokens)})
         ses.commit()
 
 
@@ -153,13 +155,18 @@ def get_month_usage(provider: str) -> int:
 
 
 def get_shared_gloss(cache_key: str):
-    """命中返回 dict,未命中返回 None;命中时 hits+1。"""
+    """命中返回 dict,未命中返回 None;命中时 hits+1(尽力而为,失败不影响释义返回)。"""
     with get_session_local()() as ses:
         row = ses.query(WordGloss).filter_by(cache_key=cache_key).first()
         if not row:
             return None
-        row.hits = (row.hits or 0) + 1
-        ses.commit()
+        try:
+            row.hits = (row.hits or 0) + 1
+            ses.commit()
+        except Exception as e:
+            # hits 只是统计;sqlite 写锁争用时放弃这次计数,别把查词挡住
+            log.debug("gloss hits increment failed: %s", e)
+            ses.rollback()
         return {"ok": True, "word": row.word, "translation": row.translation or "",
                 "phonetic": row.phonetic or "", "definition_en": "",
                 "examples": [], "cefr_level": "", "model": row.model or "shared"}
@@ -208,7 +215,9 @@ def get_engine():
         url = get_database_url()
         connect_args = {}
         if url.startswith("sqlite"):
-            connect_args = {"check_same_thread": False}
+            # check_same_thread=False:FastAPI 同步路由跑在线程池,需要跨线程复用;
+            # timeout:写锁等待上限,降低并发下 "database is locked" 的概率
+            connect_args = {"check_same_thread": False, "timeout": 30}
         _engine = create_engine(
             url,
             connect_args=connect_args,
