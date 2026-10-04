@@ -1096,26 +1096,71 @@
       });
   }
 
-  /* ---------------- 阅读进度上报 ---------------- */
+  /* ---------------- 阅读进度上报 ----------------
+     判定照 Chromium 阅读模式的 "words seen" 启发式:滚动位置只说"滚到哪",
+     阅读时长才说"读没读" —— 有效进度取两者的较小值,所以把滚动条拖到底
+     也刷不出 100%(旧版纯滚动 ≥95% 判完成的死穴就在这)。
+     时长只在前台且窗口有焦点时累计,挂后台/切走都不计。完成阈值 90%,
+     即 GA4 的 "bottom of readable content"。 */
   function bindReadingProgress() {
     const article = document.querySelector("article.entry");
     if (!article) return;
     const token = localStorage.getItem("we_token");
     if (!token) return;  // 未登录不上报
 
+    const body = article.querySelector(".entry-body") || article;
     const articleId = article.id.replace(/^article-/, "");
     const issueKeyMatch = location.pathname.match(/(\d{4}-W\d{2})/);
     const issueKey = issueKeyMatch ? issueKeyMatch[1] : (document.body.dataset.issueKey || "");
 
-    let seconds = 0;
-    const start = Date.now();
-    const tick = setInterval(() => {
-      seconds = Math.round((Date.now() - start) / 1000);
-    }, 1000);
+    const WPM = 238;             // Brysbaert 2019:英文非虚构平均 238 wpm
+    const COMPLETE_PCT = 90;
+    const words = Math.max(1, countWords(body));
+    const expectedMs = words / WPM * 60000;   // 通读全文的预期时长
+
+    let creditedMs = 0;          // 前台 + 有焦点时累计的阅读时长
+    let lastTick = Date.now();
+
+    function present() {
+      if (document.visibilityState !== "visible") return false;
+      return typeof document.hasFocus === "function" ? document.hasFocus() : true;
+    }
+    // 把 lastTick 到此刻的时长记账。force=true 用在"切走/失焦那一刻":
+    // 上一段要算进去,但此时状态已翻,present() 会误判成不在场。
+    function accrue(force) {
+      const now = Date.now();
+      const dt = now - lastTick;
+      lastTick = now;
+      if (dt <= 0 || dt >= 5000) return;   // 大跳变(休眠/后台节流)不算
+      if (force || present()) creditedMs += dt;
+    }
+
+    function countWords(el) {
+      const text = el.innerText || el.textContent || "";
+      const latin = (text.match(/[A-Za-z0-9][A-Za-z0-9'’\-]*/g) || []).length;
+      const cjk = (text.match(/[\u3400-\u9fff\uf900-\ufaff]/g) || []).length;
+      return latin + cjk;
+    }
+
+    function computeScrollPct() {
+      const top = body.getBoundingClientRect().top + window.scrollY;  // 正文顶部在文档坐标里的位置
+      const total = body.scrollHeight - window.innerHeight;
+      if (total <= 0) return 100;          // 正文比一屏还短
+      return Math.max(0, Math.min(100, (window.scrollY - top) / total * 100));
+    }
+
+    // 有效进度 = min(滚动位置, 阅读时长能支撑出的位置)
+    function progressPct() {
+      return Math.min(computeScrollPct(), creditedMs / expectedMs * 100);
+    }
+
+    const tick = setInterval(() => accrue(false), 1000);
+    window.addEventListener("blur", () => accrue(true));
+    window.addEventListener("focus", () => { lastTick = Date.now(); });
 
     let lastReport = 0;
-    function report(completed) {
-      const scrollPct = computeScrollPct();
+    function report(forceComplete) {
+      const pct = progressPct();
       fetch("/api/v1/progress", {
         method: "POST",
         headers: {
@@ -1125,9 +1170,9 @@
         body: JSON.stringify({
           issue_key: issueKey,
           article_id: articleId,
-          seconds: seconds,
-          scroll_pct: scrollPct,
-          completed: !!completed,
+          seconds: Math.round(creditedMs / 1000),
+          scroll_pct: pct,
+          completed: !!forceComplete || pct >= COMPLETE_PCT,
         }),
         keepalive: true,
       }).catch(() => {});
@@ -1148,14 +1193,6 @@
       }).catch(() => {});
     }
 
-    function computeScrollPct() {
-      const body = article.querySelector(".entry-body") || article;
-      const total = body.scrollHeight - window.innerHeight;
-      if (total <= 0) return 100;
-      const pct = (window.scrollY - body.offsetTop) / total * 100;
-      return Math.max(0, Math.min(100, pct));
-    }
-
     let raf;
     window.addEventListener("scroll", () => {
       cancelAnimationFrame(raf);
@@ -1170,13 +1207,13 @@
 
     // 离开或关闭页面前再报一次
     window.addEventListener("pagehide", () => {
+      accrue(true);
       clearInterval(tick);
-      report(computeScrollPct() >= 95);
+      report(progressPct() >= COMPLETE_PCT);
     });
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        report(computeScrollPct() >= 95);
-      }
+      accrue(true);
+      if (document.visibilityState === "hidden") report(progressPct() >= COMPLETE_PCT);
     });
   }
 
