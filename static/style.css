@@ -694,8 +694,10 @@ body.is-selecting { cursor: text; }
 .progress-list { display: flex; flex-direction: column; gap: 8px; }
 .progress-row {
   display: grid;
-  grid-template-columns: 100px 60px 80px 1fr;
-  gap: 16px;
+  /* 期号 / 标题 / 百分比 / 时长 / 状态 —— 标题由后端从 catalog 补上,
+     否则每行只剩一个期号,六行长得一模一样,看不出读的是哪篇 */
+  grid-template-columns: 96px 1fr 56px 64px 92px;
+  gap: 14px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
   font-family: var(--font-serif);
@@ -703,6 +705,11 @@ body.is-selecting { cursor: text; }
 }
 .progress-row:hover { color: var(--accent); }
 .progress-issue { font-family: var(--font-sans); font-size: 12px; color: var(--muted); }
+.progress-title {
+  font-size: 15px; line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.progress-row:hover .progress-title { color: var(--accent); }
 .progress-pct { font-weight: 600; }
 .progress-time { color: var(--muted); font-size: 13px; }
 .progress-state { font-style: italic; font-size: 13px; color: var(--muted); }
@@ -1228,10 +1235,37 @@ a.vocab-word:hover { color: var(--c-rare); }
 }
 
 /* ---------- 我的学习页 ---------- */
+/* 邮箱是一整串没有分隔符的字符,窄屏(430px)下 40px 字号会顶出横向滚动条 */
+#me-title { overflow-wrap: anywhere; }
 .me-section { padding: 30px 0 0; }
 .vocab-list-cards { display: flex; flex-direction: column; }
 .history-row { grid-template-columns: 110px 1fr 110px; }
 .history-title { font-family: var(--font-serif); font-size: 15px; }
+
+/* 学习概览:一格一项,gap 用底色描出 1px 分隔线,不用逐格画边框 */
+.me-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  margin: 26px 0 0;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.me-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  background: #fff;
+  padding: 16px 18px;
+}
+.me-stat-num {
+  font-family: var(--font-serif);
+  font-size: 26px; font-weight: 600; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.me-stat-label {
+  font-size: 12px; color: var(--muted); letter-spacing: 0.04em;
+}
 
 /* ---------- 页脚:站点地图 ---------- */
 .foot {
@@ -1271,5 +1305,10 @@ a.vocab-word:hover { color: var(--c-rare); }
   .search-page-form { flex-wrap: wrap; }
   .foot .wrap.foot-grid { grid-template-columns: 1fr 1fr; }
   .foot-about { grid-column: 1 / -1; }
+  .me-stats { grid-template-columns: 1fr 1fr; }
+  /* 窄屏进度行:只留标题 + 百分比 + 状态,期号与时长让位 */
+  .progress-item { grid-template-columns: 1fr auto auto; }
+  .progress-item .progress-issue,
+  .progress-item .progress-time { display: none; }
   .history-row { grid-template-columns: 1fr auto; }
 }

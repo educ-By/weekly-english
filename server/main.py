@@ -273,7 +273,17 @@ LEVEL_META = {
 }
 
 # catalog.json 的 mtime 缓存 —— 每周刷新后自动失效重载,平时不重复读盘
-_CATALOG_CACHE: dict = {"mtime": None, "issues": []}
+_CATALOG_CACHE: dict = {"mtime": None, "issues": [], "index": {}}
+
+
+def _catalog_index() -> dict:
+    """(期号, 文章 id) → {title, level} —— 给阅读进度补标题用。
+
+    进度表本身只存 issue_key/article_id/时长,没有标题,所以六行会一模一样,
+    看不出读的是哪一篇;这里从 catalog 补上。
+    """
+    _catalog()
+    return _CATALOG_CACHE["index"]
 
 
 def _catalog() -> list[dict]:
@@ -284,6 +294,14 @@ def _catalog() -> list[dict]:
         mtime = None
     if mtime is None or _CATALOG_CACHE["mtime"] != mtime:
         _CATALOG_CACHE["issues"] = core.load_catalog(OUT_DIR)
+        _CATALOG_CACHE["index"] = {
+            (issue["key"], a.get("id")): {
+                "title": a.get("title", ""),
+                "level": a.get("level", ""),
+            }
+            for issue in _CATALOG_CACHE["issues"]
+            for a in issue.get("articles") or []
+        }
         try:
             _CATALOG_CACHE["mtime"] = path.stat().st_mtime
         except OSError:
@@ -672,18 +690,26 @@ def list_vocab(sess: Session = Depends(db.get_db),
 @app.get("/api/v1/progress")
 def list_progress(sess: Session = Depends(db.get_db),
                   user: db.User = Depends(auth.require_user)):
-    rows = sess.query(db.ReadingProgress).filter_by(user_id=user.id).all()
-    return {"progress": [
-        {
+    rows = (sess.query(db.ReadingProgress)
+            .filter_by(user_id=user.id)
+            .order_by(db.ReadingProgress.updated_at.desc())
+            .all())
+    index = _catalog_index()
+    out = []
+    for p in rows:
+        meta = index.get((p.issue_key, p.article_id)) or {}
+        out.append({
             "issue_key": p.issue_key,
             "article_id": p.article_id,
+            # 标题从 catalog 补 —— 进度表里没存,否则每行都只剩一个期号
+            "title": meta.get("title", ""),
+            "level": meta.get("level", ""),
             "seconds_read": p.seconds_read,
             "scroll_pct": p.scroll_pct,
             "completed": p.completed,
             "updated_at": p.updated_at.isoformat() if p.updated_at else None,
-        }
-        for p in rows
-    ]}
+        })
+    return {"progress": out}
 
 
 @app.get("/api/v1/history")
@@ -763,6 +789,13 @@ def _background_refresh_once():
         core.refresh_asset_versions(OUT_DIR)
     except Exception as e:
         log.warning("Asset version refresh failed: %s", e)
+
+    # 1b) 页面上的生词表也是渲染那一刻的白名单算出来的 —— 按当前
+    #     data/cefr_vocab/* 重筛一遍,把后来加白的词从老期页面摘掉(不联网)
+    try:
+        core.refresh_rare_words(OUT_DIR)
+    except Exception as e:
+        log.warning("Rare-word refresh failed: %s", e)
 
     # 2) 改造前生成的期没有 meta.json —— 就地从它们自己的 HTML 重渲染,保证全站模板一致
     try:

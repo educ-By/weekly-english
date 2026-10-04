@@ -24,7 +24,11 @@ from fetchers.api_fetcher import fetch_newsapi
 from fetchers.guardian_fetcher import fetch_guardian
 from fetchers.html_fetcher import fetch_index_pages, fetch_page
 from pipeline.difficulty import evaluate
-from pipeline.highlight import find_out_of_scope_words
+from pipeline.highlight import (
+    find_out_of_scope_words,
+    is_truncated_contraction,
+    text_tokens,
+)
 from pipeline.summary import offline_summary
 
 log = logging.getLogger(__name__)
@@ -42,8 +46,8 @@ RENDER_MIGRATE_VERSION = 1
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
     "app.js": 45,
-    "style.css": 34,
-    "me.js": 1,
+    "style.css": 36,
+    "me.js": 2,
     "auth.js": 1,
 }
 
@@ -126,6 +130,163 @@ def refresh_asset_versions(out_dir: Path) -> int:
         log.info("Refreshed asset versions: %d page(s), %d static copy file(s)",
                  changed, synced)
     return changed
+
+
+# 生词块("Out-of-scope vocabulary")—— 模板 article.html.j2 生成,就地重算时整块重写
+_RARE_BLOCK_RE = re.compile(r'<details class="rare-words">.*?</details>', re.S)
+_RARE_WORD_RE = re.compile(r'data-word="([^"]*)"')
+
+_RARE_BLOCK_TPL = """<details class="rare-words">
+      <summary>Out-of-scope vocabulary · {n} words</summary>
+      <p class="rare-help">
+        Words below are not in the 3,500-word gaokao list (or its common inflections).
+        Hover a highlighted word for a quick gloss — or <strong>select any word or phrase</strong> in the text to translate it and save it to your words.
+      </p>
+      <div class="vocab-list">
+{buttons}      </div>
+    </details>"""
+
+
+def _render_rare_block(words: list[str]) -> str:
+    buttons = "".join(
+        f'        <button class="vocab-word vocab-rare" data-word="{w}">{w}</button>\n'
+        for w in words
+    )
+    return _RARE_BLOCK_TPL.format(n=len(words), buttons=buttons)
+
+
+_PAGE_BODY_RE = re.compile(r'<div class="entry-body"[^>]*>(.*?)</div>', re.S)
+_PAGE_P_RE = re.compile(r"<p>(.*?)</p>", re.S)
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def page_body_text(html: str) -> str:
+    """抠出页面正文(保持原大小写)。页面只印前 12 段,这是"可见片段"。"""
+    m = _PAGE_BODY_RE.search(html)
+    if not m:
+        return ""
+    paras = [unescape_html(_TAG_RE.sub("", p)).strip()
+             for p in _PAGE_P_RE.findall(m.group(1))]
+    return "\n".join(p for p in paras if p)
+
+
+def _issue_search_json(issue_dir: Path) -> dict:
+    """读一期的全文语料 search.json(小写正文);缺失或损坏返回空 dict。"""
+    path = issue_dir / "search.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        log.warning("Bad search.json for %s: %s", issue_dir, e)
+        return {}
+
+
+def page_corpus_text(page: Path, cache: dict | None = None) -> str:
+    """该篇的全文语料(同期 search.json,小写)。
+
+    页面正文只印前 12 段,而"坏出现"(URL 里的 chinadaily、被截断的 doesn’t)常常
+    落在截断之外 —— 只拿可见片段判会漏掉。传同一个 cache dict 可避免每页重读。
+    """
+    m = re.search(r"article-([0-9A-Za-z]+)\.html$", page.name)
+    if not m:
+        return ""
+    if cache is None:
+        cache = {}
+    issue_dir = page.parent
+    if issue_dir not in cache:
+        cache[issue_dir] = _issue_search_json(issue_dir)
+    return cache[issue_dir].get(m.group(1), "")
+
+
+def classify_page_rare_words(words: list[str], body_text: str,
+                             corpus_text: str = "") -> tuple[list[str], list[str], list[str]]:
+    """把一页已烤入的生词列表按当前白名单 + 当前分词重筛。
+
+    返回 (仍该保留, 已加白, 非词残留):
+      - 已加白:当前白名单已覆盖,出局;
+      - 非词残留:正文里只以"非词"形态出现 —— URL 片段(https/chinadaily)或被
+        截断的撇号(doesn’t 在旧代码下切成 doesn)。现在的分词根本不会切出它,出局;
+      - 正文里压根没出现的词:保留(判据来自可见正文 + search.json 全文,
+        两处都没有才说明只是没进这次渲染,不能当残留删掉)。
+    """
+    tokens = text_tokens(body_text) | text_tokens(corpus_text)
+    raw = (body_text + "\n" + corpus_text).lower()
+    keep: list[str] = []
+    whitelisted: list[str] = []
+    nontoken: list[str] = []
+    for w in words:
+        if not find_out_of_scope_words(w, limit=1):
+            whitelisted.append(w)
+            continue
+        low = w.lower()
+        if is_truncated_contraction(low):
+            nontoken.append(w)
+            continue
+        if low not in tokens and re.search(rf"(?<![a-z]){re.escape(low)}(?![a-z])", raw):
+            nontoken.append(w)
+            continue
+        keep.append(w)
+    return keep, whitelisted, nontoken
+
+
+def refresh_rare_words(out_dir: Path, dry_run: bool = False) -> int:
+    """就地按当前白名单重筛已渲染页面的生词块(不重渲染正文、不联网、幂等)。
+
+    页面上的生词表是"渲染那一刻"的白名单算出来的。改了 data/cefr_vocab/* 之后,
+    整站重抓只会覆盖当期(core.full_refresh 只渲染 issue_key()),启动时的
+    refresh_asset_versions 又只改资源版本号 —— 老期页面里那些早已加白的词
+    (don't/children/fully…) 就永远留在页面上。
+
+    这里读页面里既有的 data-word 列表,连同这一页自己的正文一起重筛(见
+    classify_page_rare_words),把不该留的摘掉,计数与按钮一起重写。前端
+    highlightRare() 照着按钮画线,下划线自然跟着收敛。
+
+    只在确有页面需要改动时先备份再落盘;没得改就直接返回,不碰磁盘。
+    """
+    if not out_dir.exists():
+        return 0
+    pending: list[tuple[Path, str]] = []
+    corpus_cache: dict = {}
+    for page in out_dir.rglob("article-*.html"):
+        try:
+            txt = page.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        block = _RARE_BLOCK_RE.search(txt)
+        if not block:
+            continue
+        words = [unescape_html(w) for w in _RARE_WORD_RE.findall(block.group(0))]
+        kept, _, _ = classify_page_rare_words(
+            words, page_body_text(txt), page_corpus_text(page, corpus_cache))
+        if len(kept) == len(words):
+            continue                       # 没有词该退出,这一页不动
+        new = txt[:block.start()] + _render_rare_block(kept) + txt[block.end():]
+        if "</html>" not in new:
+            log.warning("Skip rare refresh (no </html>): %s", page)
+            continue
+        pending.append((page, new))
+
+    if not pending:
+        return 0
+    if dry_run:
+        log.info("Rare-word refresh (dry run): %d page(s) would change", len(pending))
+        return len(pending)
+    if backup_rendered(out_dir, "pre-rare-refresh") is None:
+        log.warning("Rare-word refresh skipped: backup could not be created")
+        return 0
+
+    changed = 0
+    for page, new in pending:
+        try:
+            page.write_text(new, encoding="utf-8")
+            changed += 1
+        except Exception as e:
+            log.warning("Rare refresh write failed for %s: %s", page, e)
+    log.info("Rare-word refresh: %d/%d page(s) rewritten", changed, len(pending))
+    return changed
+
 
 LEVEL_LABEL = {"B1": "入门", "B2": "进阶", "C1": "高阶"}
 
@@ -1049,6 +1210,9 @@ _JUNK_PATTERNS = [
     # 嵌入播放器残留
     re.compile(r"embed embed\b", re.I),
     re.compile(r"<iframe", re.I),
+    # 整条 URL 的样板段(CBS/NPR 抓取会带一行 "https://…/#post-update-… link copied")
+    re.compile(r"^\s*(?:https?://|www\.)\S+\s*$", re.I),
+    re.compile(r"\blink copied\b", re.I),
 ]
 
 def _filter_junk(records: list[dict]) -> list[dict]:

@@ -36,13 +36,50 @@
         fetch("/api/v1/progress", { headers }).then(r => r.json()).catch(() => ({})),
         fetch("/api/v1/history", { headers }).then(r => r.json()).catch(() => ({})),
       ]);
-      renderVocab(vocabData.entries || []);
-      renderProgress(progData.progress || []);
-      renderHistory(histData.entries || []);
+      const vocab = vocabData.entries || [];
+      const progress = progData.progress || [];
+      const history = histData.entries || [];
+      renderStats(vocab, progress, history);
+      renderVocab(vocab);
+      renderProgress(progress);
+      renderHistory(history);
     } catch (e) {
       localStorage.clear();
       location.href = "/auth/login";
     }
+  }
+
+  // 打开过多少次都算同一篇 —— 和「阅读历史」的去重口径保持一致
+  function distinctArticles(entries) {
+    const seen = new Set();
+    entries.forEach(e => seen.add(`${e.issue_key}|${e.article_id}`));
+    return seen.size;
+  }
+
+  function renderStats(vocab, progress, history) {
+    const box = slot("me-stats");
+    if (!box) return;
+    const opened = distinctArticles(history);
+    const completed = progress.filter(p => p.completed).length;
+    const minutes = Math.round(progress.reduce((s, p) => s + (p.seconds_read || 0), 0) / 60);
+
+    // 全新账户给一排 0 没有意义,不如不显示这块
+    if (!progress.length && !vocab.length && !opened) {
+      box.hidden = true;
+      return;
+    }
+
+    const cells = [
+      [progress.length, progress.length === 1 ? "article in progress" : "articles in progress"],
+      [completed, "completed"],
+      [minutes, minutes === 1 ? "minute read" : "minutes read"],
+      [vocab.length, vocab.length === 1 ? "word saved" : "words saved"],
+    ];
+    box.innerHTML = cells.map(([n, label]) =>
+      `<div class="me-stat"><span class="me-stat-num">${n}</span>` +
+      `<span class="me-stat-label">${escape(label)}</span></div>`
+    ).join("");
+    box.hidden = false;
   }
 
   function renderVocab(entries) {
@@ -96,11 +133,15 @@
     rows.slice().sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))
       .forEach(p => {
         const item = document.createElement("a");
-        item.className = "progress-row";
+        item.className = "progress-row progress-item";
         item.href = articleHref(p.issue_key, p.article_id);
         const mins = Math.round((p.seconds_read || 0) / 60);
+        // 标题由后端从 catalog 补上(进度表里没存)。没有标题就退回期号,
+        // 免得整行空着看不出是哪一篇。
+        const title = p.title || p.article_id;
         item.innerHTML = `
           <span class="progress-issue">${escape(p.issue_key)}</span>
+          <span class="progress-title" title="${escape(title)}">${escape(title)}</span>
           <span class="progress-pct">${Math.round(p.scroll_pct || 0)}%</span>
           <span class="progress-time">${mins} min</span>
           <span class="progress-state">${p.completed ? "Completed" : "In progress"}</span>
