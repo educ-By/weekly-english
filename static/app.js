@@ -381,6 +381,7 @@
       const html =
         `<div class="vp-word">${escapeHtml(info.word)}` +
         (info.phonetic ? `<span class="vp-phon">${escapeHtml(info.phonetic)}</span>` : "") +
+        (info.lemma ? `<span class="vp-lemma" title="原词形 → 原型">→ ${escapeHtml(info.lemma)}</span>` : "") +
         (info.cefr_level ? `<span class="vp-level">${escapeHtml(info.cefr_level)}</span>` : "") +
         `<button class="vp-close" data-close-popup title="Close">✕</button>` +
         `</div>` +
@@ -569,7 +570,10 @@
       // 状态条常驻 DOM、靠 hidden 反复开关,重放一次淡入免得每次都硬蹦出来
       replayPopIn(toastBox, toastAnim, durMs("--dur", 0.18));
       clearTimeout(toastTimer);
-      if (autoHide) toastTimer = setTimeout(() => { toastBox.hidden = true; }, autoHide);
+      // 提示一律显示几秒后自己消失;唯独"下载中"要常驻 —— 它由下载进度持续改写,
+      // 结束时会被"就绪"toast 接替,而那个会自动消失
+      const hide = autoHide !== undefined ? autoHide : (kind === "download" ? 0 : 4000);
+      if (hide > 0) toastTimer = setTimeout(() => { toastBox.hidden = true; }, hide);
     }
 
     // 下载进度推送:状态条与弹窗里的"下载中"文案同步刷新(force 用于刚转入下载态时立刻改写状态条)
@@ -634,11 +638,12 @@
 
     function drawDictHit(el, word, info) {
       drawCard(el, {
-        word,
+        word,                                   // 头词保持文中原形(sought 不换成 seek)
         phonetic: info.phonetic || "",
         definition_en: info.definition_en || "",
         translation: info.translation || "",
         cefr_level: info.cefr_level || "",
+        lemma: info.lemma || "",                // 变形词标注原型
       }, "", true);
     }
 

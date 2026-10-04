@@ -520,7 +520,12 @@ def api_dict(word: str = Query(..., min_length=1),
     ck = f"{word}|{ctx}"
     try:
         shared = db.get_shared_gloss(ck)
-        if shared and shared.get("translation"):
+        if shared:
+            # 旧时代的缓存行格式不一(音标带斜杠、甚至有把提示词吐回来的脏行),
+            # 统一清洗;洗不出有效释义就当作没命中,落到词典重新查
+            shared = dict_client.normalize_gloss(shared)
+        if shared:
+            shared["lemma"] = dict_client.lemma_of(word)
             return shared
     except Exception as e:
         log.warning("shared gloss read failed: %s", e)

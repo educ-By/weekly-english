@@ -116,18 +116,46 @@ def _candidates(word: str) -> list[str]:
     return out
 
 
+# ECDICT 给变形词常单收一条"元描述"词条(sought → "seek的过去式和过去分词",
+# 中间还会夹"和")。注意只降权**整条都是元描述**的 —— 混合释义("a. 天生的；bear的
+# 过去分词")前半是真词义,降权它反而会把 born 推到 bear"n. 熊"上。
+_META_TAIL = r"(?:过去式|过去分词|现在分词|第三人称单数|复数|原型|比较级|最高级)"
+_META_GLOSS_RE = re.compile(rf"^[\w'’\- ]+的{_META_TAIL}(?:和{_META_TAIL})*$")
+
+
 def _tidy_zh(text: str) -> str:
-    """ECDICT 释义压成一行,弹窗里读起来清爽些。
+    """ECDICT 释义压成一行、标点统一成中文 —— 各来源的弹窗排版由此长得一样。
 
     注意它家的换行是**字面量** "\n"(反斜杠+n),不是真的换行符,两种都要切。
     """
     parts = re.split(r"\\n|\r?\n", text or "")
-    out = [re.sub(r"\s+", " ", p).strip() for p in parts]
-    return "; ".join(p for p in out if p).strip("; ").strip()
+    segs = []
+    for p in parts:
+        p = re.sub(r"\s+", " ", p).strip()
+        # 段内只要有中文,半角逗号/分号一律统一成中文标点(方括号标签前后也不例外)
+        if _CJK_RE.search(p):
+            p = p.replace(",", "，").replace(";", "；")
+        if p:
+            segs.append(p)
+    out = "；".join(segs).strip("； ").strip()
+    return out.rstrip("。") or out
+
+
+def _clean_phonetic(text: str) -> str:
+    """音标统一不带斜杠;混进来的非音标脏值(旧 AI 缓存里的"英式音标")直接丢。"""
+    p = (text or "").strip().strip("/")
+    p = re.sub(r"\s+", " ", p)
+    if not p or _CJK_RE.search(p) or len(p) > 48:
+        return ""
+    return p
 
 
 def lookup_local(word: str) -> Optional[dict]:
-    """离线词典查询(含词形归一)。多个候选命中时取最常见的那条。"""
+    """离线词典查询(含词形归一)。
+
+    排序优先级:真词义 > 元描述("…的过去式"这类) > 生僻(frq=0)。
+    所以 sought 会拿到 seek 的"vt. 寻求…",而不是"seek的过去式和过去分词"。
+    """
     if not ensure_ready():
         return None
     cands = _candidates(word)
@@ -148,14 +176,16 @@ def lookup_local(word: str) -> Optional[dict]:
         con.close()
     if not rows:
         return None
-    exact = [r for r in rows if r[0] == cands[0]]
-    pool = exact or rows
-    # frq=0 表示不在 COCA(生僻);优先取有条目编号的,编号小的更常见
-    pool.sort(key=lambda r: (0, r[4]) if r[4] else (1, 0))
-    w, phonetic, pos, translation, frq = pool[0]
-    return {"word": w, "phonetic": phonetic, "pos": pos,
+    # 全候选统一排名:真词义 > 元描述("…的过去式" / "pl. …") ;同分时原词形优先,
+    # 再按词频。所以 sought 会拿到 seek 的"vt. 寻求…",而不是"seek的过去式和过去分词"。
+    def _rank(r):
+        gloss = r[3] or ""
+        meta = 1 if (_META_GLOSS_RE.search(gloss) or gloss.startswith("pl. ")) else 0
+        return (meta, 0 if r[0] == cands[0] else 1, 0 if r[4] else 1, -r[4])
+    w, phonetic, pos, translation, frq = min(rows, key=_rank)
+    return {"word": w, "phonetic": _clean_phonetic(phonetic), "pos": pos,
             "translation": _tidy_zh(translation), "frq": frq,
-            "lemmatized": w != cands[0]}
+            "lemma": w if w != cands[0] else ""}
 
 
 # ---------------- 机翻兜底 ----------------
@@ -194,7 +224,7 @@ def translate_fallback(text: str) -> Optional[str]:
     return zh
 
 
-# ---------------- 统一入口 ----------------
+# ---------------- 统一出口 ----------------
 
 def lookup(word: str) -> dict:
     """查词:离线词典 → MyMemory。返回结构让调用方直接包成 /api/dict 响应。"""
@@ -203,17 +233,53 @@ def lookup(word: str) -> dict:
         return {"ok": False, "word": word, "translation": ""}
     hit = lookup_local(w)
     if hit:
-        return {
+        return normalize_gloss({
             "ok": True, "word": w, "phonetic": hit["phonetic"],
             "pos": hit["pos"], "translation": hit["translation"],
+            "lemma": hit["lemma"],
             "definition_en": "", "examples": [], "cefr_level": "",
             "model": "ecdict",
-        }
+        }) or {"ok": False, "word": w, "translation": ""}
     zh = translate_fallback(w)
     if zh:
-        return {
+        return normalize_gloss({
             "ok": True, "word": w, "phonetic": "", "pos": "",
-            "translation": zh, "definition_en": "", "examples": [],
+            "translation": _tidy_zh(zh), "lemma": "",
+            "definition_en": "", "examples": [],
             "cefr_level": "", "model": "mymemory",
-        }
+        }) or {"ok": False, "word": w, "translation": ""}
     return {"ok": False, "word": w, "translation": ""}
+
+
+# 旧 AI 时代的缓存里混着把提示词占位符原样吐出来的脏数据
+_DIRTY_TRANSLATION_RE = re.compile(r"本句义|不超过\d*字|英式音标|美式音标")
+
+
+def normalize_gloss(info: dict) -> Optional[dict]:
+    """把任何来源的查词响应规整成统一格式;脏数据返回 None(调用方当作未命中)。
+
+    应用点:/api/dict 的三个出口 —— 共享缓存命中、ECDICT、MyMemory —— 保证
+    音标永远不带斜杠、释义永远是中文标点单行、占位符脏值永远不进弹窗。
+    """
+    if not info:
+        return None
+    info = dict(info)
+    info["phonetic"] = _clean_phonetic(info.get("phonetic") or "")
+    tr = _tidy_zh(info.get("translation") or "")
+    if not tr or _DIRTY_TRANSLATION_RE.search(tr) or not _CJK_RE.search(tr):
+        return None
+    info["translation"] = tr
+    info.setdefault("lemma", "")
+    info["definition_en"] = ""
+    return info
+
+
+def lemma_of(word: str) -> str:
+    """查该词的原型(命中归一词时返回如 'seek',原词或查不到返回 '')。
+
+    共享缓存里没存 lemma,所以缓存命中也要补一次 —— 纯索引查询,毫秒级。
+    """
+    if not word:
+        return ""
+    hit = lookup_local(word)
+    return (hit or {}).get("lemma", "")

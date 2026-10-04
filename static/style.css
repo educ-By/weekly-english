@@ -427,6 +427,12 @@ body.is-selecting { cursor: text; }
   padding-bottom: 4px; margin-bottom: 4px;
 }
 .vocab-popup .vp-phon { color: var(--muted); font-weight: 400; font-style: italic; }
+.vocab-popup .vp-lemma {
+  color: var(--muted); font-weight: 400;
+  font-size: 11px; padding: 1px 6px;
+  border: 1px solid var(--line); border-radius: 999px;
+  white-space: nowrap;
+}
 .vocab-popup .vp-trans { color: var(--muted); line-height: 1.5; }
 
 /* vocab 词汇分组面板 */
