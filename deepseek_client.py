@@ -94,12 +94,17 @@ def _client(cfg: dict, timeout: float = 30.0):
 def ask(question: str,
         context_articles: Iterable[dict] | None = None,
         model: str | None = None,
-        max_tokens: int = 600,
+        max_tokens: int = 900,
         temperature: float = 0.3) -> dict:
     """
     调用 DeepSeek-V4.1-Flash 回答用户问题,自动带严格 system guard。
     context_articles: 用来限定范围 — 模型只允许用这些文章作为上下文。
     返回:{ok, content, refused, model}
+
+    DeepSeek 是思考型模型:答案写在 content,推理写在 reasoning_content,而思考
+    本身也吃 max_tokens。问题短/开放时偶发"思考把配额耗光"或"答案全写进思考"
+    → content 为空,前端就显示 "(no answer)"。兜底:content 空则从
+    reasoning_content 提取结论(与 lookup_word 同款),仍空则放宽 max_tokens 重问。
     """
     cfg = _cfg("ASK", "DEEPSEEK", "LLM")
     if not cfg["api_key"]:
@@ -119,20 +124,39 @@ def ask(question: str,
 
     messages.append({"role": "user", "content": question.strip()})
 
+    def _extract(msg) -> str:
+        """content 优先;为空时取思考文本的最后一个非空段落(结论通常在末尾)。"""
+        text = (msg.content or "").strip()
+        if text:
+            return text
+        rc = getattr(msg, "reasoning_content", None) or ""
+        paras = [p.strip() for p in rc.split("\n") if p.strip()]
+        return paras[-1][:600] if paras else ""
+
     try:
         client = _client(cfg, timeout=60.0)   # 问答要生成一整段,给足时间
-        resp = client.chat.completions.create(
-            model=model or cfg["model"],
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-        content = resp.choices[0].message.content or ""
-        refused = "outside the scope" in content.lower()
-        usage = getattr(resp, "usage", None)
-        return {"ok": True, "refused": refused, "content": content.strip(),
-                "model": model or cfg["model"],
-                "usage_tokens": getattr(usage, "total_tokens", 0) or 0}
+        last: dict = {}
+        for attempt, budget in enumerate((max_tokens, 1200)):
+            resp = client.chat.completions.create(
+                model=model or cfg["model"],
+                messages=messages,
+                max_tokens=budget,
+                temperature=temperature,
+            )
+            msg = resp.choices[0].message
+            content = _extract(msg).strip()
+            usage = getattr(resp, "usage", None)
+            last = {"ok": True, "refused": "outside the scope" in content.lower(),
+                    "content": content,
+                    "model": model or cfg["model"],
+                    "usage_tokens": getattr(usage, "total_tokens", 0) or 0}
+            if content:
+                return last
+            log.warning("deepseek ask returned empty content (attempt %d), "
+                        "retrying with max_tokens=%d", attempt + 1, budget)
+        # 两次都空:给句能读的提示,别让前端落到 "(no answer)"
+        last["content"] = "AI 没能生成回答，请换个问法再试一次。"
+        return last
     except Exception as e:
         log.warning("deepseek ask failed: %s", e)
         return {"ok": False, "refused": False,
