@@ -15,5 +15,9 @@ COPY . .
 # 词表种子备份 — 挂载卷会覆盖 /app/data,启动时从这里恢复词表
 RUN mkdir -p /opt/cefr_seed && cp -r data/cefr_vocab /opt/cefr_seed/cefr_vocab
 
+# 历史期种子 — 周更只产当期,旧的抓不回来;卷被重建(或从没拿到过)时
+# 由启动逻辑把这批渲染成品补进 out_dir,否则 archive 里永远只有当期。
+RUN mkdir -p /opt/issues_seed && cp -r data/archive_seed/. /opt/issues_seed/
+
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn server.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

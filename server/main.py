@@ -71,23 +71,67 @@ class CachedStatic(StaticFiles):
 app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
 
 
-def _ensure_data_seed():
-    """挂载持久化卷后 /app/data 可能为空、或缺少后来新增的词表文件 — 从镜像内种子补齐缺失文件。"""
+# 镜像内种子 —— 挂载持久化卷会把 /app/data 整个盖住,卷上永远看不到镜像里备的东西
+_CEFR_SEED = Path("/opt/cefr_seed/cefr_vocab")
+_ISSUES_SEED = Path("/opt/issues_seed")
+
+# 本轮启动从种子补进来的期数 —— 补过就必须重建首页/archive/catalog
+_seeded_issue_count = 0
+
+
+def _ensure_cefr_seed() -> None:
+    """卷上可能为空、或缺少后来新增的词表文件 —— 逐个补齐缺失文件(已存在的不动)。"""
     import shutil
-    dst = Path(__file__).resolve().parent.parent / "data" / "cefr_vocab"
-    for seed in (Path("/opt/cefr_seed/cefr_vocab"),):
-        if not seed.exists():
-            continue
-        dst.mkdir(parents=True, exist_ok=True)
-        copied = []
-        for f in seed.iterdir():
-            if f.is_file() and not (dst / f.name).exists():
-                shutil.copyfile(f, dst / f.name)
-                copied.append(f.name)
-        if copied:
-            log.info("cefr_vocab seed restored: %s", ", ".join(copied))
+    dst = OUT_DIR.parent / "cefr_vocab"
+    if not _CEFR_SEED.exists():
+        log.warning("cefr_vocab missing and no seed found at %s", dst)
         return
-    log.warning("cefr_vocab missing and no seed found at %s", dst)
+    dst.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for f in _CEFR_SEED.iterdir():
+        if f.is_file() and not (dst / f.name).exists():
+            shutil.copyfile(f, dst / f.name)
+            copied.append(f.name)
+    if copied:
+        log.info("cefr_vocab seed restored: %s", ", ".join(copied))
+
+
+def _ensure_issues_seed() -> int:
+    """把镜像里的历史期补进 out_dir。
+
+    周更只产当期、旧的又抓不回来,所以历史期只能随镜像发种子:卷被重建过
+    (或从没拿到过历史期)时,archive 里就只剩当期。整目录补齐,已有的期不动
+    —— 当期由每周刷新自己维护,复制的成品页也由启动时的版本重写/词表重筛跟上。
+    """
+    global _seeded_issue_count
+    if not _ISSUES_SEED.is_dir():
+        return 0
+    import shutil
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    added: list[str] = []
+    for week in sorted(_ISSUES_SEED.iterdir()):
+        if not (week.is_dir() and re.match(r"\d{4}-W\d{2}$", week.name)):
+            continue
+        dst = OUT_DIR / week.name
+        if dst.exists():
+            continue
+        try:
+            shutil.copytree(week, dst)
+            added.append(week.name)
+        except Exception as e:
+            # 半成品目录会把下次启动的补种挡住(dst.exists() 为真),必须清掉
+            shutil.rmtree(dst, ignore_errors=True)
+            log.warning("Issue seed copy failed for %s: %s", week.name, e)
+    if added:
+        _seeded_issue_count += len(added)
+        log.info("Seeded %d historical issue(s): %s", len(added), ", ".join(added))
+    return len(added)
+
+
+def _ensure_data_seed():
+    """挂载持久化卷后 /app/data 可能为空、或缺少后来新增的文件 —— 从镜像内种子补齐。"""
+    _ensure_cefr_seed()
+    _ensure_issues_seed()
 
 
 @app.on_event("startup")
@@ -826,8 +870,8 @@ def _background_refresh_once():
         rebuilt = 0
         log.warning("Legacy issue rebuild failed: %s", e)
 
-    # 3) catalog.json 缺失(旧卷)或刚迁移过 —— 重建首页 / archive / 跨期索引
-    if rebuilt or not (OUT_DIR / "catalog.json").exists():
+    # 3) catalog.json 缺失(旧卷)、刚迁移过、或刚补进历史期 —— 重建首页 / archive / 跨期索引
+    if rebuilt or _seeded_issue_count or not (OUT_DIR / "catalog.json").exists():
         try:
             issues = core.scan_issues(OUT_DIR)
             if issues:
