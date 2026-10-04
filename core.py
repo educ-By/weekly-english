@@ -46,7 +46,7 @@ RENDER_MIGRATE_VERSION = 1
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
     "app.js": 46,
-    "style.css": 37,
+    "style.css": 38,
     "me.js": 4,
     "auth.js": 1,
 }
