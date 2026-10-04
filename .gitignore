@@ -1,7 +1,10 @@
 data/output/
 data/preview/
 data/backup/
+data/dict/ecdict.sqlite
+data/dict/*.tmp
 data/.render-migrate-*
+.ecdict_raw.csv
 __pycache__/
 *.pyc
 .env

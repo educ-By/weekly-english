@@ -45,7 +45,7 @@ RENDER_MIGRATE_VERSION = 1
 # 所以启动时会用 refresh_asset_versions() 就地重写这些引用;否则老用户
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
-    "app.js": 46,
+    "app.js": 47,
     "style.css": 39,
     "me.js": 4,
     "auth.js": 1,

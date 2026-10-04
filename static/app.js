@@ -391,31 +391,21 @@
       showAt(el, html);
     }
 
-    // 内置引擎用不了时的退路:/api/dict(服务端共享词典,命中过就直接复用,不重复烧 token)
+    // 引擎提示里的"再试一次查词"按钮:直接查服务端词典(离线 ECDICT + 免费机翻)
     async function onlineLookup(btn) {
       const word = popup.dataset.word;
       if (!active || active.word !== word) return;
       const ctx = active.ctx || popup.dataset.sentence || "";
       btn.disabled = true;
       btn.textContent = "查询中…";
-      try {
-        const url = `/api/dict?word=${encodeURIComponent(word)}` +
-                    (ctx ? `&sentence=${encodeURIComponent(ctx)}` : "");
-        const r = await fetch(url);
-        const info = await r.json();
-        const zh = (info && (info.translation || info.definition_en)) || "";
-        if (!zh) throw new Error("empty");
-        drawCard(active.anchor || active.el, {
-          word,
-          phonetic: info.phonetic || "",
-          definition_en: info.definition_en || "",
-          translation: info.translation || "",
-          cefr_level: info.cefr_level || "",
-        }, "", true);
-      } catch (_) {
-        btn.disabled = false;
-        btn.textContent = "查询失败，稍后再试";
+      const info = await dictLookup(word, ctx);
+      if (!active || active.word !== word) return;
+      if (info) {
+        drawDictHit(active.anchor || active.el, word, info);
+        return;
       }
+      btn.disabled = false;
+      btn.textContent = "查询失败，稍后再试";
     }
 
     // ---- 确定性关闭模型:弹窗一旦显示,只有这几种方式关闭 ----
@@ -455,6 +445,10 @@
     let btVerdict = "";          // 会话级结论(no-api/unavailable/no-response):悬停时直接复用,不必每次等探测器超时
     let btPct = 0;
     let btNote = "";             // 最近一次失败原因原文(排障用)
+
+    // 这些是"这台浏览器就没有内置翻译引擎"的确定性结论(手机基本全中)——
+    // 命中就直接转服务端词典,别再让用户点一下;其余原因是暂时的,保留提示与手动重试。
+    const BT_UNSUPPORTED = new Set(["no-api", "unavailable", "no-response"]);
 
     const BT_PAIR = { sourceLanguage: "en", targetLanguage: "zh" };
     const btHasAPI = () => typeof Translator !== "undefined";
@@ -590,11 +584,11 @@
     function btReport() {
       switch (btPhase) {
         case "no-api":
-          toast("这个浏览器没有内置翻译引擎 · 请用 Chrome / Edge 138+ 桌面版打开", "err"); break;
+          toast("这个浏览器没有内置翻译引擎 · 已改用本站词典查词", "ok"); break;
         case "unavailable":
-          toast("浏览器没有开放内置翻译 · 可能被设置或策略关掉了", "err"); break;
+          toast("浏览器没有开放内置翻译 · 已改用本站词典查词", "ok"); break;
         case "no-response":
-          toast("浏览器内置翻译没有响应 · 点生词可用在线词典", "err"); break;
+          toast("浏览器内置翻译没有响应 · 已改用本站词典查词", "ok"); break;
         case "need-gesture":
           toast("内置翻译语言包还没下载 · 点击页面任意处开始下载（约 10-60 秒）", "err"); break;
         case "downloading":
@@ -617,36 +611,51 @@
     window.__bt = () => ({ phase: btPhase, pct: btPct, note: btNote,
                            hasAPI: btHasAPI(), gesture: btHasGesture() });
 
-    const OFFLINE_MSG = "AI service is not available offline.";
-
-    async function lookup(word, ctx) {
+    // 服务端查词(离线 ECDICT 词典 + MyMemory 机翻,不烧 AI、不慢)——
+    // 内置引擎用不了时的自动退路与划词翻译都走这里。失败返回 null(不缓存失败)。
+    async function dictLookup(word, ctx) {
       const key = word + "|" + (ctx || "").slice(0, 60);
       if (cache.has(key)) return cache.get(key);
       const p = (async () => {
         try {
           const url = `/api/dict?word=${encodeURIComponent(word)}` +
                       (ctx ? `&sentence=${encodeURIComponent(ctx)}` : "");
-          const r = await fetch(url, { method: "GET" });
+          const r = await fetch(url);
           if (r.ok) {
             const data = await r.json();
             if (data && (data.translation || data.definition_en)) return data;
           }
-        } catch (_) { /* offline */ }
-
-        return {
-          word,
-          phonetic: "",
-          translation: "AI service is not available offline.",
-          definition_en: "",
-          examples: [],
-          cefr_level: "",
-        };
+        } catch (_) { /* 离线 / 超时 */ }
+        return null;
       })();
-      // 失败的查询不进缓存 — 修好 key 后刷新即可重试,不会一直显示 offline
-      p.then(info => {
-        if (info && info.translation !== OFFLINE_MSG) cache.set(key, p);
-      });
+      p.then(info => { if (info) cache.set(key, p); });   // 失败不进缓存,下回可重试
       return p;
+    }
+
+    function drawDictHit(el, word, info) {
+      drawCard(el, {
+        word,
+        phonetic: info.phonetic || "",
+        definition_en: info.definition_en || "",
+        translation: info.translation || "",
+        cefr_level: info.cefr_level || "",
+      }, "", true);
+    }
+
+    // 内置引擎用不了(手机几乎都是)且服务端也查不到时的兜底文案
+    function showEngineTip(el, word, reason) {
+      const tip = {
+        "no-api": "这个浏览器没有内置翻译引擎（需 Chrome / Edge 138+ 桌面版）",
+        "unavailable": "浏览器没有开放内置翻译，可能被设置或策略关掉了",
+        "no-response": "浏览器内置翻译没有响应（引擎未就绪）",
+        "need-gesture": "语言包还没下载：点一下页面任意处开始下载，约 10-60 秒",
+        "downloading": "正在下载语言包，下好后再悬停一次即可",
+        "failed": "翻译语言包下载失败，请检查网络",
+        "empty": "未获取到释义，请再悬停一次",
+      }[reason] || "翻译不可用";
+      const fallback = `<button class="vp-add" data-online-lookup>再试一次查词</button>`;
+      drawCard(el, { word, phonetic: "", definition_en: "",
+                     translation: tip, examples: [], cefr_level: "" }, fallback);
     }
 
     function onEnter(e) {
@@ -676,21 +685,18 @@
           return;
         }
         const reason = (res && res.err) || "failed";
-        const tip = {
-          "no-api": "这个浏览器没有内置翻译引擎（需 Chrome / Edge 138+ 桌面版）",
-          "unavailable": "浏览器没有开放内置翻译，可能被设置或策略关掉了",
-          "no-response": "浏览器内置翻译没有响应（引擎未就绪）",
-          "need-gesture": "语言包还没下载：点一下页面任意处开始下载，约 10-60 秒",
-          "downloading": "正在下载语言包，下好后再悬停一次即可",
-          "failed": "翻译语言包下载失败，请检查网络",
-          "empty": "未获取到释义，请再悬停一次",
-        }[reason] || "翻译不可用";
-        // 内置引擎用不了时给一条退路,但必须由用户点 —— 不默默烧 AI 额度
-        const fallback = reason === "empty"
-          ? ""
-          : `<button class="vp-add" data-online-lookup>用在线词典查这个词</button>`;
-        drawCard(el, { word, phonetic: "", definition_en: "",
-                       translation: tip, examples: [], cefr_level: "" }, fallback);
+        // 浏览器压根没有内置引擎(手机几乎全是这一种)—— 直接查服务端词典并把结果
+        // 填进弹窗,别再让用户点一下确认。服务端是离线词典+免费机翻,不烧 AI。
+        if (BT_UNSUPPORTED.has(reason)) {
+          dictLookup(word, ctx).then(info => {
+            if (!active || active.word !== word) return;
+            if (info) drawDictHit(el, word, info);
+            else showEngineTip(el, word, reason);
+          });
+          return;
+        }
+        // 引擎只是暂时没就绪(缺手势/下载中/失败)—— 保留提示与手动重试
+        showEngineTip(el, word, reason);
       });
     }
 
@@ -915,20 +921,15 @@
                                   translation: res.zh, cefr_level: "" }, "", true);
         return;
       }
-      // 内置引擎不可用时退到在线词典(用户主动点击才烧 AI 额度)
-      try {
-        const q = active.ctx ? `&sentence=${encodeURIComponent(active.ctx)}` : "";
-        const r = await fetch(`/api/dict?word=${encodeURIComponent(word)}${q}`);
-        const info = await r.json();
-        if (!info || !(info.translation || info.definition_en)) throw new Error("empty");
-        drawCard(active.anchor, { word, phonetic: info.phonetic || "",
-                                  definition_en: info.definition_en || "",
-                                  translation: info.translation || "",
-                                  cefr_level: info.cefr_level || "" }, "", true);
-      } catch (_) {
-        btn.disabled = false;
-        btn.textContent = "翻译失败，重试";
+      // 内置引擎不可用时退到服务端词典(离线 ECDICT + 免费机翻,不烧 AI)
+      const info = await dictLookup(word, active.ctx);
+      if (!active || active.word !== word) return;
+      if (info) {
+        drawDictHit(active.anchor, word, info);
+        return;
       }
+      btn.disabled = false;
+      btn.textContent = "翻译失败，重试";
     }
     async function copySelection(btn) {
       const text = (activeSel && activeSel.toString()) || (active && active.word) || "";

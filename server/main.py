@@ -1,7 +1,7 @@
 """
 FastAPI 主程序 — Weekly English 后端服务
   - 主页 / 精读页 / archive:由 core 渲染
-  - /api/dict?word=x:DeepSeek 词典查询(替代有道,可回退)
+  - /api/dict?word=x:查词(离线 ECDICT + MyMemory 机翻,不调 AI)
   - /api/ask:对 DeepSeek 提问,自动限制到本周文章
   - /api/issues:列出全部期数(给前端 SPA 或小部件用)
   - /api/admin/refresh:手动触发本周抓取
@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 
 import core
 import deepseek_client
+import dict_client
 import db
 import auth
 
@@ -74,6 +75,7 @@ app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
 # 镜像内种子 —— 挂载持久化卷会把 /app/data 整个盖住,卷上永远看不到镜像里备的东西
 _CEFR_SEED = Path("/opt/cefr_seed/cefr_vocab")
 _ISSUES_SEED = Path("/opt/issues_seed")
+_DICT_SEED = Path("/opt/dict_seed")
 
 # 本轮启动从种子补进来的期数 —— 补过就必须重建首页/archive/catalog
 _seeded_issue_count = 0
@@ -128,9 +130,33 @@ def _ensure_issues_seed() -> int:
     return len(added)
 
 
+def _ensure_dict_seed() -> None:
+    """离线词典的压缩源(gz)也放卷里 —— 卷上缺就从镜像种子补一份。
+
+    真正的 sqlite 索引不随镜像发(比 gz 大 3 倍),由 dict_client 从 gz 现建,
+    建好落在卷上,重启复用。
+    """
+    import shutil
+    dst = OUT_DIR.parent / "dict" / dict_client.GZ_PATH.name
+    if dst.exists():
+        return
+    src = _DICT_SEED / dict_client.GZ_PATH.name
+    if not src.exists():
+        log.warning("ecdict gz missing and no seed found at %s", src)
+        return
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        log.info("ecdict seed restored: %s (%.1f MB)",
+                 dst, dst.stat().st_size / 1048576)
+    except Exception as e:
+        log.warning("ecdict seed copy failed: %s", e)
+
+
 def _ensure_data_seed():
     """挂载持久化卷后 /app/data 可能为空、或缺少后来新增的文件 —— 从镜像内种子补齐。"""
     _ensure_cefr_seed()
+    _ensure_dict_seed()
     _ensure_issues_seed()
 
 
@@ -480,27 +506,27 @@ def _record_usage(provider: str, tokens: int, request: Request | None = None):
 
 
 @app.get("/api/dict")
-def api_dict(request: Request,
-             word: str = Query(..., min_length=1),
+def api_dict(word: str = Query(..., min_length=1),
              sentence: str | None = Query(None)):
-    """单词速查:云端共享词典(所有用户共用一份) → 未命中才调 LLM 并入库。"""
+    """单词速查 —— 全链路不调 AI:共享缓存 → 离线 ECDICT → MyMemory 免费机翻。
+
+    手机浏览器没有内置翻译引擎,这条就是它们的主力路径,所以既不能烧 token 也不能慢。
+    `sentence` 只用来分缓存键(同一个词在不同上下文里算不同条目),不参与取词。
+    """
     word = word.strip().lower()
     if not word:
         raise HTTPException(400, "word is required")
     ctx = (sentence or "").strip()[:160]
-    ck = f"{word}|{ctx}"   # 与 deepseek_client.lookup_word 的键保持一致
+    ck = f"{word}|{ctx}"
     try:
         shared = db.get_shared_gloss(ck)
         if shared and shared.get("translation"):
             return shared
     except Exception as e:
         log.warning("shared gloss read failed: %s", e)
-    if _quota_exceeded("glm", request):
-        return {"ok": False, "word": word,
-                "translation": "本月 AI 额度已用完,下月自动恢复。"}
-    info = deepseek_client.lookup_word(word, sentence_context=sentence)
-    if info.get("ok"):
-        _record_usage("glm", info.get("usage_tokens") or 0, request)
+
+    info = dict_client.lookup(word)
+    if info.get("ok") and info.get("translation"):
         try:
             db.save_shared_gloss(ck, word, info, model=info.get("model") or "")
         except Exception as e:
@@ -862,6 +888,13 @@ def _background_refresh_once():
         core.refresh_rare_words(OUT_DIR)
     except Exception as e:
         log.warning("Rare-word refresh failed: %s", e)
+
+    # 1c) 离线词典:首次启动从 gz 建 sqlite(几秒),放到后台做,别让第一个
+    #     查词的请求去等建索引
+    try:
+        dict_client.ensure_ready()
+    except Exception as e:
+        log.warning("ECDICT index warm-up failed: %s", e)
 
     # 2) 改造前生成的期没有 meta.json —— 就地从它们自己的 HTML 重渲染,保证全站模板一致
     try:

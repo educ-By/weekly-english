@@ -19,5 +19,9 @@ RUN mkdir -p /opt/cefr_seed && cp -r data/cefr_vocab /opt/cefr_seed/cefr_vocab
 # 由启动逻辑把这批渲染成品补进 out_dir,否则 archive 里永远只有当期。
 RUN mkdir -p /opt/issues_seed && cp -r data/archive_seed/. /opt/issues_seed/
 
+# 离线词典种子 — 卷会盖住 /app/data,把压缩源备到 /opt;sqlite 索引不随镜像发,
+# 由启动逻辑从 gz 现建(比 gz 大 3 倍,没必要进仓库/镜像)
+RUN mkdir -p /opt/dict_seed && cp data/dict/ecdict.csv.gz /opt/dict_seed/
+
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn server.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
