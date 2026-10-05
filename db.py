@@ -131,6 +131,52 @@ class TokenUsage(Base):
     __table_args__ = (UniqueConstraint("provider", "month", name="uq_usage_month"),)
 
 
+class ArticleSummary(Base):
+    """卡片中文简介的预生成缓存 — 键是文章 id(=sha1(url)[:16],跨天稳定)。
+
+    周一晚把候选文章的简介用 DeepSeek 批量接口(半价)预生成好,周二早上正式
+    更新时按 id 直取,不再等 8 线程的 AI 往返。周一抓到而周二没进刊的文章会
+    白存几条,但同一篇文章早晚会被收录,命中率只会越滚越高。
+    """
+    __tablename__ = "article_summary"
+    key = Column(String(32), primary_key=True)     # 文章 id = sha1(url)[:16]
+    title = Column(String(512), default="")
+    summary = Column(Text, default="")
+    model = Column(String(64), default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+def summaries_existing(keys: list[str]) -> set[str]:
+    """返回 keys 里已有简介的那些(批量提交前过滤,幂等)。"""
+    if not keys:
+        return set()
+    with get_session_local()() as ses:
+        rows = ses.query(ArticleSummary.key).filter(ArticleSummary.key.in_(keys)).all()
+        return {r[0] for r in rows}
+
+
+def save_summary(key: str, title: str, summary: str, model: str = "") -> None:
+    """存一条预生成简介(已存在则忽略 —— 旧的不动,省一次写)。"""
+    if not key or not summary:
+        return
+    with get_session_local()() as ses:
+        if ses.get(ArticleSummary, key):
+            return
+        ses.add(ArticleSummary(key=key, title=(title or "")[:512],
+                               summary=summary, model=model))
+        ses.commit()
+
+
+def get_summaries(keys: list[str]) -> dict[str, str]:
+    """按文章 id 批量取预生成简介。"""
+    if not keys:
+        return {}
+    with get_session_local()() as ses:
+        rows = (ses.query(ArticleSummary.key, ArticleSummary.summary)
+                .filter(ArticleSummary.key.in_(keys)).all())
+        return {k: s for k, s in rows if s}
+
+
 def add_usage(provider: str, tokens: int):
     if not tokens:
         return

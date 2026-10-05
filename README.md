@@ -258,8 +258,9 @@ BBC Learning English*
 
 ## 自动化
 
-- **APScheduler**:每周一 07:00(Asia/Shanghai)自动 `core.full_refresh()`
-- **手动触发**: 手动刷新接口已下线(任何人可调会白烧 AI token)。需要立即刷新时在容器内执行 `python -c "import core; core.full_refresh(core.Path('data/output'))"`,或等每周一 07:00 的定时任务。
+- **APScheduler**(Asia/Shanghai):周一 20:00 离线预生成下期候选文章的中文简介
+  (写入 `article_summary` 表,按文章 id=sha1(url) 跨天复用);周二 06:30 自动 `core.full_refresh()` 出刊 —— 简介直取缓存,缺的才内联补
+- **手动触发**: 手动刷新接口已下线(任何人可调会白烧 AI token)。需要立即刷新时在容器内执行 `python -c "import core; core.full_refresh(core.Path('data/output'))"`,或等周二 06:30 的定时任务。
 
 ---
 
@@ -284,7 +285,7 @@ BBC Learning English*
 - ✅ Web Speech 朗读 + 自定义音频上传
 - ✅ 查词不调用 AI:离线 ECDICT 词典 + MyMemory 免费机翻兜底(手机没有内置翻译引擎也能用)
 - ✅ DeepSeek 提问(严格 scope guard)
-- ✅ APScheduler 周更
+- ✅ APScheduler 周更(周二 06:30 出刊)+ 周一晚简介预生成
 - ⏳ 用户登录 / 学习记录(可选)
 - ⏳ 移动端 PWA(可选)
 

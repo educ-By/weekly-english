@@ -1282,11 +1282,30 @@ def _strip_caption_deck(articles: list[dict]) -> None:
 
 
 def _apply_zh_summaries(articles: list[dict]) -> None:
-    """卡片简介换成 DeepSeek 中文总结(并发,失败回退英文摘要)。"""
+    """卡片简介换成中文总结:先查预生成缓存(周一晚批量接口的产物,秒填),
+    缺的才内联调 DeepSeek(并发)。生成不出来就留空,不回退英文。"""
     from concurrent.futures import ThreadPoolExecutor
     import deepseek_client
-    if not deepseek_client.is_configured():
+    if not articles:
         return
+
+    # 查库优先 —— 文章 id = sha1(url),跨天稳定,周一晚批量的结果在这里等
+    try:
+        import db
+        cached = db.get_summaries([a["id"] for a in articles])
+    except Exception as e:
+        log.warning("summary cache read failed: %s", e)
+        cached = {}
+    for a in articles:
+        zh = cached.get(a["id"])
+        if zh:
+            a["deck"] = zh
+    hits = sum(1 for a in articles if cached.get(a["id"]))
+    todo = [a for a in articles if not cached.get(a["id"])]
+    log.info("zh summaries: %d from cache, %d to generate inline", hits, len(todo))
+    if not todo or not deepseek_client.is_configured():
+        return
+
     def one(a):
         try:
             zh = deepseek_client.summarize_zh(a.get("title", ""),
@@ -1296,8 +1315,63 @@ def _apply_zh_summaries(articles: list[dict]) -> None:
             log.warning("zh summary failed for %s: %s", a.get("title", "")[:40], e)
             a["deck"] = ""
     with ThreadPoolExecutor(max_workers=8) as ex:
-        list(ex.map(one, articles))
+        list(ex.map(one, todo))
     log.info("zh summaries applied")
+
+
+def prepare_summary_batch(config: dict | None = None,
+                          max_articles: int = 60) -> dict:
+    """周一晚:真实收集候选文章,把缺简介的用 8 线程预生成,直接写 article_summary。
+
+    DeepSeek 官方没有 Batch API(其 /files 只服务聊天文件上传),所以"批量"
+    实为出刊前的离线预生成 —— 好处不变:周二早上正式更新按 id 直取,不再等
+    AI 往返。文章 id = sha1(url) 跨天稳定;周二实际收录与周一候选的差异由
+    _apply_zh_summaries 的内联兜底补齐。返回 {generated, cached, failed}。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    import deepseek_client
+    out = {"generated": 0, "cached": 0, "failed": 0}
+    if not deepseek_client.is_configured():
+        log.info("summary prepare skipped: LLM not configured")
+        return out
+    try:
+        candidates = collect_candidates(config, max_articles)
+    except Exception as e:
+        log.warning("summary prepare collect failed: %s", e)
+        return out
+    if not candidates:
+        log.info("summary prepare: no candidates")
+        return out
+    try:
+        import db
+        have = db.summaries_existing([r["id"] for r in candidates])
+    except Exception as e:
+        log.warning("summary cache check failed: %s", e)
+        have = set()
+    todo = [{"id": r["id"], "title": r.get("title", ""),
+             "body": r.get("body") or r.get("deck", "")}
+            for r in candidates if r["id"] not in have and (r.get("body") or "").strip()]
+    out["cached"] = len(candidates) - len(todo)
+    if not todo:
+        log.info("summary prepare: all %d candidates already cached", len(candidates))
+        return out
+
+    def one(item):
+        try:
+            zh = deepseek_client.summarize_zh(item["title"], item["body"])
+            if zh:
+                db.save_summary(item["id"], item["title"], zh,
+                                model="pre-gen")
+                out["generated"] += 1
+            else:
+                out["failed"] += 1
+        except Exception as e:
+            log.warning("summary pre-gen failed for %s: %s", item["id"], e)
+            out["failed"] += 1
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        list(ex.map(one, todo))
+    log.info("summary prepare done: %s (candidates=%d)", out, len(candidates))
+    return out
 
 
 def _interleave_by_source(records: list[dict]) -> list[dict]:
@@ -1325,6 +1399,21 @@ def _interleave_by_source(records: list[dict]) -> list[dict]:
     return out
 
 
+def collect_candidates(config: dict | None = None,
+                       max_articles: int = 60) -> list[dict]:
+    """收集管线:抓取 → 过滤 → 去重 → 按源穿插 → 截断。只收集,不分级不渲染。
+
+    full_refresh(周二早上正式出刊)和周一晚的批量简介预生成共用这一条管线,
+    保证"提前预生成的那批文章"和"最终进刊的这批"是同一批口径筛出来的。
+    """
+    cfg = config or {}
+    raw = collect(cfg)
+    raw = _filter_junk(raw)
+    raw = _dedupe_same_story(raw)
+    raw = _interleave_by_source(raw)
+    return raw[:max_articles]
+
+
 def full_refresh(out_dir: Path,
                  config: dict | None = None,
                  max_articles: int = 60) -> dict:
@@ -1332,12 +1421,7 @@ def full_refresh(out_dir: Path,
     一次完整刷新:抓取 → 分级 → 渲染到 out_dir/<issue_key>/ → 更新主页与 archive。
     返回最新一期路径信息。
     """
-    cfg = config or {}
-    raw = collect(cfg)
-    raw = _filter_junk(raw)
-    raw = _dedupe_same_story(raw)
-    raw = _interleave_by_source(raw)
-    raw = raw[:max_articles]
+    raw = collect_candidates(config, max_articles)
     log.info("Refresh collected %d articles", len(raw))
     if not raw:
         return {"ok": False, "reason": "no articles"}

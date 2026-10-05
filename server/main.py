@@ -1026,7 +1026,7 @@ def _background_refresh_once():
             log.warning("Initial refresh failed: %s", e)
 
 
-# ---------- 定时调度:每周一 07:00 ----------
+# ---------- 定时调度:周一晚预生成简介,周二 06:30 正式更新 ----------
 scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
 
@@ -1040,10 +1040,28 @@ def _scheduled_refresh():
         log.warning("Scheduled refresh failed: %s", e)
 
 
+# 卡片简介:周一晚离线预生成,周二早上出刊按 id 直取 article_summary 表,不再等
+# AI 往返。(DeepSeek 无官方 Batch API —— 其 /files 只服务聊天文件上传 —— 所以
+# "批量"实为出刊前的内联并发预生成,直接写缓存库。)
+def _prepare_batch_job():
+    try:
+        result = core.prepare_summary_batch()
+        log.info("Summary pre-generation done: %s", result)
+    except Exception as e:
+        log.warning("Summary pre-generation failed: %s", e)
+
+
 scheduler.add_job(
     _scheduled_refresh,
-    CronTrigger(day_of_week="mon", hour=7, minute=0),
+    CronTrigger(day_of_week="tue", hour=6, minute=30),
     id="weekly_refresh",
+    replace_existing=True,
+    coalesce=True,
+)
+scheduler.add_job(
+    _prepare_batch_job,
+    CronTrigger(day_of_week="mon", hour=20, minute=0),
+    id="summary_prepare",
     replace_existing=True,
     coalesce=True,
 )

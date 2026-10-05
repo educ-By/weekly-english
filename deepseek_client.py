@@ -9,6 +9,7 @@ DeepSeek 客户端 — 用于后端 AI 服务。
    "英语学习 + 本周文章"范围内,其他话题一律拒答。
 """
 from __future__ import annotations
+import json
 import os
 import re
 import logging
@@ -177,6 +178,16 @@ def ask(question: str,
 
 _zh_summary_cache: dict[str, str] = {}
 
+_SUMMARY_INSTRUCTION = '用一句不超过 40 字的简体中文概括这篇文章讲什么。只输出这句话本身。'
+
+
+def _summary_prompt(title: str, body: str) -> str:
+    """简介 prompt(内联 summarize_zh 与批量接口共用,保证口径一致)。"""
+    body_snip = " ".join((body or "").split())[:600]
+    return ('文章标题: ' + title + '\n正文开头: ' + body_snip + '\n'
+            + _SUMMARY_INSTRUCTION)
+
+
 def summarize_zh(title: str, body: str, model: str | None = None) -> str:
     """生成一句话中文简介(卡片用)。失败返回空串,调用方回退到英文摘要。"""
     ck = title
@@ -185,16 +196,14 @@ def summarize_zh(title: str, body: str, model: str | None = None) -> str:
     cfg = _cfg("LLM", "DEEPSEEK", "ASK")
     if not cfg["api_key"]:
         return ""
-    body_snip = " ".join((body or "").split())[:600]
-    prompt = ('文章标题: ' + title + '\n正文开头: ' + body_snip + '\n'
-              '用一句不超过 40 字的简体中文概括这篇文章讲什么。只输出这句话本身。')
+    prompt = _summary_prompt(title, body)
     try:
         extra = _thinking_extra(cfg)
         client = _client(cfg)
         out = ""
         for attempt in range(3):   # 失败/无中文输出时重试;最后一次仅用标题
             use_prompt = prompt if attempt < 2 else (
-                '文章标题: ' + title + '\n用一句不超过 40 字的简体中文概括这篇文章讲什么。只输出这句话本身。')
+                '文章标题: ' + title + '\n' + _SUMMARY_INSTRUCTION)
             resp = client.chat.completions.create(
                 model=model or cfg["model"],
                 messages=[{"role": "user", "content": use_prompt}],
