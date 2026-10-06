@@ -1,0 +1,4374 @@
+{
+  "pages": 149,
+  "pages_with_block": 138,
+  "whitelist_size": 24300,
+  "candidates": [
+    {
+      "word": "backlash",
+      "articles": 9,
+      "occurrences": 20
+    },
+    {
+      "word": "pathogens",
+      "articles": 6,
+      "occurrences": 11
+    },
+    {
+      "word": "cardiovascular",
+      "articles": 5,
+      "occurrences": 20
+    },
+    {
+      "word": "dementia",
+      "articles": 5,
+      "occurrences": 9
+    },
+    {
+      "word": "biomedical",
+      "articles": 5,
+      "occurrences": 7
+    },
+    {
+      "word": "gravitational",
+      "articles": 4,
+      "occurrences": 17
+    },
+    {
+      "word": "archaeologist",
+      "articles": 4,
+      "occurrences": 16
+    },
+    {
+      "word": "pathogen",
+      "articles": 4,
+      "occurrences": 15
+    },
+    {
+      "word": "trajectory",
+      "articles": 4,
+      "occurrences": 14
+    },
+    {
+      "word": "geopolitical",
+      "articles": 4,
+      "occurrences": 12
+    },
+    {
+      "word": "lethal",
+      "articles": 4,
+      "occurrences": 10
+    },
+    {
+      "word": "quantum",
+      "articles": 4,
+      "occurrences": 9
+    },
+    {
+      "word": "biotech",
+      "articles": 4,
+      "occurrences": 8
+    },
+    {
+      "word": "bioweapons",
+      "articles": 4,
+      "occurrences": 8
+    },
+    {
+      "word": "ironclad",
+      "articles": 4,
+      "occurrences": 8
+    },
+    {
+      "word": "migratory",
+      "articles": 4,
+      "occurrences": 7
+    },
+    {
+      "word": "inflammation",
+      "articles": 4,
+      "occurrences": 6
+    },
+    {
+      "word": "bipartisan",
+      "articles": 4,
+      "occurrences": 5
+    },
+    {
+      "word": "excavated",
+      "articles": 4,
+      "occurrences": 4
+    },
+    {
+      "word": "excavation",
+      "articles": 4,
+      "occurrences": 4
+    },
+    {
+      "word": "megalithic",
+      "articles": 3,
+      "occurrences": 24
+    },
+    {
+      "word": "megalith",
+      "articles": 3,
+      "occurrences": 18
+    },
+    {
+      "word": "megaliths",
+      "articles": 3,
+      "occurrences": 18
+    },
+    {
+      "word": "millennium",
+      "articles": 3,
+      "occurrences": 18
+    },
+    {
+      "word": "archaeologists",
+      "articles": 3,
+      "occurrences": 10
+    },
+    {
+      "word": "genome",
+      "articles": 3,
+      "occurrences": 10
+    },
+    {
+      "word": "celestial",
+      "articles": 3,
+      "occurrences": 8
+    },
+    {
+      "word": "intercepted",
+      "articles": 3,
+      "occurrences": 8
+    },
+    {
+      "word": "agates",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "anthropologist",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "archival",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "clippings",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "curator",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "imbued",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "inaugural",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "info",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "jumble",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "moss",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "paleontology",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "proliferation",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "self-confidence",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "shuffled",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "sun-drenched",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "trove",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "zero-sum",
+      "articles": 3,
+      "occurrences": 6
+    },
+    {
+      "word": "additives",
+      "articles": 3,
+      "occurrences": 5
+    },
+    {
+      "word": "ancestral",
+      "articles": 3,
+      "occurrences": 5
+    },
+    {
+      "word": "atrophy",
+      "articles": 3,
+      "occurrences": 5
+    },
+    {
+      "word": "blockade",
+      "articles": 3,
+      "occurrences": 5
+    },
+    {
+      "word": "gonna",
+      "articles": 3,
+      "occurrences": 5
+    },
+    {
+      "word": "sea-spanning",
+      "articles": 3,
+      "occurrences": 5
+    },
+    {
+      "word": "constellation",
+      "articles": 3,
+      "occurrences": 4
+    },
+    {
+      "word": "phenomenal",
+      "articles": 3,
+      "occurrences": 4
+    },
+    {
+      "word": "charcoal",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "combo",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "delved",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "engravings",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "exec",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "geologist",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "geophysics",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "outbursts",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "paleobotanist",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "pre-megalithic",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "recalibrating",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "resilient",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "rites",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "untangle",
+      "articles": 3,
+      "occurrences": 3
+    },
+    {
+      "word": "iphone",
+      "articles": 2,
+      "occurrences": 12
+    },
+    {
+      "word": "trevally",
+      "articles": 2,
+      "occurrences": 12
+    },
+    {
+      "word": "witchcraft",
+      "articles": 2,
+      "occurrences": 12
+    },
+    {
+      "word": "anthem",
+      "articles": 2,
+      "occurrences": 8
+    },
+    {
+      "word": "asteroid",
+      "articles": 2,
+      "occurrences": 8
+    },
+    {
+      "word": "bigeye",
+      "articles": 2,
+      "occurrences": 8
+    },
+    {
+      "word": "bioweapon",
+      "articles": 2,
+      "occurrences": 8
+    },
+    {
+      "word": "co-lead",
+      "articles": 2,
+      "occurrences": 8
+    },
+    {
+      "word": "regurgitated",
+      "articles": 2,
+      "occurrences": 8
+    },
+    {
+      "word": "toxin",
+      "articles": 2,
+      "occurrences": 8
+    },
+    {
+      "word": "polarization",
+      "articles": 2,
+      "occurrences": 7
+    },
+    {
+      "word": "fundraising",
+      "articles": 2,
+      "occurrences": 6
+    },
+    {
+      "word": "iphones",
+      "articles": 2,
+      "occurrences": 6
+    },
+    {
+      "word": "itinerary",
+      "articles": 2,
+      "occurrences": 6
+    },
+    {
+      "word": "malaria",
+      "articles": 2,
+      "occurrences": 6
+    },
+    {
+      "word": "neurodegenerative",
+      "articles": 2,
+      "occurrences": 6
+    },
+    {
+      "word": "humanoid",
+      "articles": 2,
+      "occurrences": 5
+    },
+    {
+      "word": "loft",
+      "articles": 2,
+      "occurrences": 5
+    },
+    {
+      "word": "abstain",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "allay",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "apocalyptic",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "archaeological",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "arson",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "artistry",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "astropolitics",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "atypical",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "beacon",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "besotted",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "biosecurity",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "borough",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "botanist",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "bots",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "broadband",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "bunker-owning",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "bustling",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "candidly",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "chaotically",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "chikungunya",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "chile",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "chimes",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "churning",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "co-creator",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "co-creators",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "co-founded",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "colluding",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "combustible",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "corral",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "decompacts",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "demons",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "dimple",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "dispelled",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "disproportionate",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "domiciles",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "doomsday",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "echolocation",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "embittered",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "enslaver",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "entropy",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "ex-girlfriend",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "ex-partner",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "exotic-sounding",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "featureless",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "feng",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "firsthand",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "fluffier",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "folio",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "freakish",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "fugitive",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "genomes",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "grievance",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "hard-coded",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "helm",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "hubs",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "inadvertent",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "inscribed",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "itchy",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "jostling",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "kinship",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "kleptoparasite",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "kleptoparasitic",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "low-frequency",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "microasteroids",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "mid-july",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "milliseconds",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "morsels",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "mortar",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "n-word",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "obituary",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "obliterates",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "pathology",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "pelted",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "pro-palestinian",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "procure",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "prosthetic",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "regolith",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "retaliatory",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "retraces",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "reusable",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "ruminative",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "sexfasciatus",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "shui",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "smitten",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "snorkeling",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "swaths",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "tattoo",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "tattoos",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "thwarted",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "trevallys",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "truncatus",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "unapologetically",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "unflinching",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "vigilant",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "vocalizations",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "voracious",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "whittle",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "yuan",
+      "articles": 2,
+      "occurrences": 4
+    },
+    {
+      "word": "calligraphy",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "co-host",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "collaborators",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "consequential",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "culprit",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "disproportionately",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "freelance",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "gumbo",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "high-stakes",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "horrific",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "ingesting",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "issuance",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "neuroscientist",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "readiness",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "reiterated",
+      "articles": 2,
+      "occurrences": 3
+    },
+    {
+      "word": "adamant",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "albeit",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "amok",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "amulets",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "anachronistic",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "asteroids",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "avatar",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "avid",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "belemnite",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "belindarobinson",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "bewitched",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "bewitchments",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "bladder",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "bubbly",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "bulge",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "buzzy",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "calligraphers",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "cataclysmic",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "chatbots",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "chime",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "chinadailyusa",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "co-founders",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "combat-ready",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "credo",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "daisy",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "demon",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "demonstrably",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "detract",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "digitized",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "ellipses",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "esoteric",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "ethos",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "euphemistically",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "geothermal",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "hexafoils",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "humanoids",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "irreversibility",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "kitten",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "laminated",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "macabre",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "mama",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "masons",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "megapixel",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "motor-neuron",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "oxidative",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "philanthropy",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "plagiarized",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "prowess",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "rejuvenation",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "remit",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "scoffed",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "scooped",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "spleen",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "stature",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "steadfast",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "theorem",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "tug-of-war",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "unremittingly",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "ushered",
+      "articles": 2,
+      "occurrences": 2
+    },
+    {
+      "word": "anthropology",
+      "articles": 1,
+      "occurrences": 12
+    },
+    {
+      "word": "measles",
+      "articles": 1,
+      "occurrences": 12
+    },
+    {
+      "word": "vascular",
+      "articles": 1,
+      "occurrences": 12
+    },
+    {
+      "word": "amyloid",
+      "articles": 1,
+      "occurrences": 8
+    },
+    {
+      "word": "manananggal",
+      "articles": 1,
+      "occurrences": 8
+    },
+    {
+      "word": "sojourn",
+      "articles": 1,
+      "occurrences": 8
+    },
+    {
+      "word": "czar",
+      "articles": 1,
+      "occurrences": 6
+    },
+    {
+      "word": "enslaved",
+      "articles": 1,
+      "occurrences": 6
+    },
+    {
+      "word": "icloud",
+      "articles": 1,
+      "occurrences": 6
+    },
+    {
+      "word": "mibrains",
+      "articles": 1,
+      "occurrences": 6
+    },
+    {
+      "word": "panelists",
+      "articles": 1,
+      "occurrences": 6
+    },
+    {
+      "word": "rogue",
+      "articles": 1,
+      "occurrences": 6
+    },
+    {
+      "word": "acquitted",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "angina",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "anti-dumping",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "autopsy",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "centralization",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "composable",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "counternarcotics",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "countersue",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "cyanide",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "fibrosis",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "fundraise",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "glucose",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "horticultural",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "mockup",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "mono",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "non-apple",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "nondisclosure",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "open-source",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "ourself",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "pavilions",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "pericytes",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "protostars",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "runoff",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "scribal",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "self-driving",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "stereo",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "summation",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "supercollider",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "traffickers",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "transcriptomic",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "unjustifiable",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "viscount",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "withdrew",
+      "articles": 1,
+      "occurrences": 4
+    },
+    {
+      "word": "ablaze",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "abysmal",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "acclimating",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "actuators",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "air-launched",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "algorithms",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "amaranth",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "amphibious",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "annihilate",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "anthology",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "anti-government",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "anti-hate",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "anti-semitism",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "anti-social",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "anti-surveillance",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ardor",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "aswang",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "autism",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "avalanche",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "backstabbing",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "bandstand",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "baptisia",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "bestselling",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "bilingual",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "biomedicine",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "blaring",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "blatant",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "bloggers",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "blood-vessel",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "boldness",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "brevity",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "buoyed",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "burgeoning",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "caginess",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "canyons",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "carbs",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "cartels",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "categorized",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ceasefire",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "chatbot",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "claimant",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-author",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-chair",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-creation",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-founder",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-hosts",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-leader",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-leads",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-president",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "co-sponsors",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "codename",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "cohort",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "collaborator",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "commemorative",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "competitiveness",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "compoundable",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "computer-y",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "confiscated",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "consignment",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "contemptuously",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "contingency",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "couleur",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "craftspeople",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "critters",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "crux",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "crypto",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "culinary",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "curvature",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "custodian",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "d'affaires",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "decimation",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "decoupling",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "demonstrators",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "demoralized",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "devoid",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "digitization",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "digitize",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "dinged",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "discrete",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "dissuaded",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "diversification",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "draping",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "drug-trafficking",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "dual-use",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "dystopian",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "e-commerce",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "e-ink",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "eaves",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "electromagnetic",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "electromagnetism",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "emanating",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "embers",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "epidemiological",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "epigenetic",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "equinox",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "eulogy",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "exacerbated",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "excavator",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "excavators",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "executable",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "exes",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "extortion",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "fandom",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "far-flung",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "fateful",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "faux",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "fends",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "filovirus",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "fintech",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "firmware",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ford",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "fulsome",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "gamepad",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "gaudiness",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "gene-editing",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "geophysical",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "glitch",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "gosh",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "grapples",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "handcuffs",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "health-conscious",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "heck",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "helium",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "hemorrhagic",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "high-poverty",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "high-profile",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "highest-profile",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "hoarding",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "honks",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "hormonal",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "horrendous",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "hues",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "hyperscale",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "hypertension",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "imessage",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "imitators",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "immersive",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "immunization",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "immunologists",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "immunology",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "impede",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "improvisation",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "indigo",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ineloquent",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "inevitably",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ingested",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "innermost",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "intercollegiate",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "interstellar",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "investigative",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "invoking",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ipad",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ipods",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "jurisdictional",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "kayaks",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "kilter",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "left-leaning",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "leopard",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "lethality",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "limericks",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "lipids",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "long-awaited",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "lore",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "lungi",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "macos",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mananangal",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mantra",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "margarine",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "master-of-disguise",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "maxim",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "measles-related",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mega",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "messianic",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mid-september",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "military-industrial",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mini",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mites",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mnras",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "moratorium",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mortise-and-tenon",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "motif",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "mumps",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "musings",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "narcoterrorists",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "navigable",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "neolabs",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "niche",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "nightmarish",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "nipping",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "nomads",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "non-antioxidant",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "nostalgia",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ornate",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pageantry",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "peeve",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "perjury",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "permafrost",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "petabytes",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "photogenic",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pigeon-keeper",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pissed",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "poaching",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pollinator",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pollinators",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pompano",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "postmortem",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pre-approve",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pre-installed",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pre-recorded",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "prefecture",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pricier",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "prioritise",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "prioritize",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "proliferative",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "pungent",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "rammed",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "rapper",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "rattlesnake",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "re-record",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "rebuke",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "regimen",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "regression",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "remilitarization",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "residency",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "respite",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "resurgence",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "retro",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "retrofitting",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "rhino",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "ribosome",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "romesco",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "rubella",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "rupees",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "sabotage",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "scurry",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "seamlessly",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "self-discovery",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "self-explanatory",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "self-proclaimed",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "selfhood",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "selfies",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "semblance",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "severance",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "sexuality",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "silos",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "simmer",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "slop-laden",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "smaragdina",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "smeared",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "snag",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "spawned",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "sperm",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "spike",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "spiking",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "stabilization",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "stardom",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "stockpiles",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "strategist",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "subpoenaed",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "subpoenas",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "subsidiary",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "substantive",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "supplemental",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "surcharges",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "survival-threatening",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "synced",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "techno-music",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "theocracy",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "tinkerers",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "tiyanak",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "toggle",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "torso",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "transcribe",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "transcription",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "treehoppers",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "tumultuous",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "two-ply",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "typhoid",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "unravel",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "vampire-like",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "vestibular",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "vinyl",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "virology",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "whirlwind",
+      "articles": 1,
+      "occurrences": 2
+    },
+    {
+      "word": "abated",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "abdicate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "aberration",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "acoustic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "aerospace",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "algorithm",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "alma",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "almonds",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "amnesty",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "amphitheater",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "amplitude",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anatomically",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ancien",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "angry-ass",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ankylosing",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "annotation",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "annulled",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anthony",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anthropological",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anti",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anti-black",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anti-blackness",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anti-dei",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "anti-semitic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "antioxidants",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ascorbate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ascorbic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "astrocytes",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "attribution",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "baryon",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "beheld",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "bigotry",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "binge",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "boggles",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "brazen",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "broach",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "broached",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "brunt",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "brutalize",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "bulldozers",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "buzziest",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "canon",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "capex",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "carjacking",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "carousel",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cease-fire",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cellos",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cerebrospinal",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cerebrovascular",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "chandelier",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "charitably",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "chengsi",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "chili",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "chisel",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "chugging",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "citric",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "clamor",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "co-pilot",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "coaxed",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "combatants",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "concert-goers",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "conciliatory",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "conglomerate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "congresspeople",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cooing",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "coup-plot",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "craftsmanship",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "creepy",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "critiqued",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "croutons",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cryopreserved",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cryopreserving",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "custodians",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "cylindrical",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "defamation",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "dehumanizing",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "demolition",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "derided",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "detainees",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "diagnostic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "diagnostics",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "dictatorship",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "dinger's",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "discretionary",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "disqualify",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "dissuading",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "divergence",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "double-digit",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "dric",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "duel",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "dysregulation",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ecologist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "effigy",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "egocentric",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "electrodes",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "electrostatic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "elusive",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "emblazoned",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "emendations",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "emeritus",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "encampment",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "entanglement",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "epistolary",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "equatorial",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "equity-based",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "erythorbate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ethicist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ethnicity",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "eurheartj",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ex-banker",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "excavates",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "exhilarating",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "extricate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "famil",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "fiery",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "fillets",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "financiers",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "fisherman-turned-fish",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "flakes",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "forensic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "forgo",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "frenzy",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "geographical",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "glial",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "glycation",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "glycol",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "grandeur",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "grappling",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "gravitationally",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "grenades",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "handhelds",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "handwritten",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hazelnuts",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hefty",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "heterosexual",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "highest-grossing",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hippocampal",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "homeostasis",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "homicide",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "horticulturists",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hummingbird",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hurtling",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hyperintensities",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hypermarkets",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "hyperscalers",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "inflammatory",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "inflection",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "insulin",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "interwoven",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "jackhammer",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "jnnp-",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "kosher",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "laden",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "lanie",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "laundering",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ledge",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "libration",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "lipid",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "litigation",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "lofts",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "longevity-focused",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "low-carb",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "lysosomal",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "macroeconomic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "macroeconomist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "mafioso",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "makeshift",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "meddle",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "megaretailers",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "megawatt",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "merciless",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "metabisulphite",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "metabolizing",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "meteorites",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "mibrain",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "microbiota",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "microgrid-connected",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "mid-august",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "mid-life",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "mid-priced",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "minced",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "misogyny",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "mitigate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "molten",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "myelin",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "neonatal",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "neurodegeneration",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "neuronal",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "neurons",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "nicotine",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "nitrite",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "node",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "non-copyrighted",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "non-economic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "non-processed",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "nonpartisan",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "nostalgic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "nullify",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "octave-separated",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "opold",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ordinance",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "organoid",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ornithologist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "oscillates",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "outburst",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "oxidation",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pancreas",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pang",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "parity",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "parsley",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pathologist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "philanthropist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pigeon-keepers",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "piquillo",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pneumatic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "podium",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "polyethylene",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "potassium",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pouches",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "prairie",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pretzels",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "projectile",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "propulsion",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "psychotherapy",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "purported",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "pusback",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "qince",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "quasi-stable",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ramrodded",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "rapists",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "re-entry",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "reframing",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "rehydrate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "reimposed",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "renounce",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "replicate",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "replicating",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "restructuring",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "revoke",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "rubble",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "sapphire",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "sauna",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "saxophonist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "scintilla",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "scowling",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "seared",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "self-deport",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "semi-official",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "semileptonic",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "sequel",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "sequins",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "shallots",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "shrouded",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "slingshot",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "slop",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "slurs",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "smoothie",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "snipers",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "snobbery",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "spectral",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "spiked",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "spondylitis",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "stealth",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "tayo",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "testament",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "torque",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "torrent",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "traceable",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "trans",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "transitologist",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "trolls",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "truce",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "unipolar",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "unregulated",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "upheaval",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "vendetta",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "ventricular",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "verve",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "vigilance",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "villain",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "vinaigrette",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "visceral",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "wades",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "wangxiaodong",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "weird-girl",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "withheld",
+      "articles": 1,
+      "occurrences": 1
+    },
+    {
+      "word": "wobbles",
+      "articles": 1,
+      "occurrences": 1
+    }
+  ],
+  "whitelisted": [],
+  "nontoken": []
+}
