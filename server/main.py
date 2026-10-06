@@ -35,6 +35,7 @@ import deepseek_client
 import dict_client
 import db
 import auth
+import ielts
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "data" / "output"
@@ -72,8 +73,6 @@ class CachedStatic(StaticFiles):
         resp = super().file_response(*args, **kwargs)
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return resp
-
-app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
 
 
 # 镜像内种子 —— 挂载持久化卷会把 /app/data 整个盖住,卷上永远看不到镜像里备的东西
@@ -188,6 +187,11 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Weekly English", version="1.0.0", lifespan=lifespan)
+
+# /static 挂载必须在这个真正的 app 上 —— 之前挂在文件前部那个被 191 行覆盖的
+# 旧 app 实例上,静态文件一直靠 catch-all 从 data/output/static 兜底,新增的
+# static/ 文件(如 ielts.js)要等下一次全量渲染才会出现。
+app.mount("/static", CachedStatic(directory=str(STATIC_DIR)), name="static")
 
 
 # ---------- 主页 / 精读页 / archive ----------
@@ -498,6 +502,151 @@ def search_page(q: str = ""):
         total=len(results),
     )
     return HTMLResponse(html)
+
+
+# ---------- 雅思学习专区 ----------
+@app.get("/ielts", response_class=HTMLResponse)
+def ielts_home():
+    total = len(ielts.ensure_words())
+    html = _TPL_ENV.get_template("ielts.html.j2").render(
+        page="ielts", nav="ielts", total_words=total)
+    return HTMLResponse(html)
+
+
+@app.get("/ielts/vocab", response_class=HTMLResponse)
+def ielts_vocab_page(q: str = "", page: int = 1):
+    result = ielts.query(q=q, page=page)
+    pageno = result.pop("pageno")
+    html = _TPL_ENV.get_template("ielts_vocab.html.j2").render(
+        page="ielts-vocab", nav="ielts", pageno=pageno, **result)
+    return HTMLResponse(html)
+
+
+@app.get("/ielts/flashcards", response_class=HTMLResponse)
+def ielts_flashcards_page():
+    html = _TPL_ENV.get_template("ielts_flashcards.html.j2").render(
+        page="ielts-flashcards", nav="ielts")
+    return HTMLResponse(html)
+
+
+@app.get("/ielts/practice", response_class=HTMLResponse)
+def ielts_practice_page():
+    html = _TPL_ENV.get_template("ielts_practice.html.j2").render(
+        page="ielts-practice", nav="ielts",
+        ai_ready=deepseek_client.is_configured())
+    return HTMLResponse(html)
+
+
+@app.get("/api/ielts/words")
+def api_ielts_words(q: str = "", page: int = 1):
+    """词表搜索 + 分页(无需登录)。"""
+    return ielts.query(q=q, page=page)
+
+
+@app.get("/api/ielts/drill")
+def api_ielts_drill(limit: int = 20, request: Request = None):
+    """闪卡抽词:登录用户优先抽未掌握的(box<3),其余按词表顺序补足;
+    未登录就按词表顺序给。返回 items 带 box/known。"""
+    limit = max(1, min(limit, 60))
+    all_words = ielts.ensure_words()
+    picked: list[dict] = []
+    user_id = None
+    try:
+        authz = (request.headers.get("authorization") or "")
+        if authz.lower().startswith("bearer "):
+            user_id = int(auth.decode_token(authz[7:].strip()) or 0) or None
+    except Exception:
+        user_id = None
+    progress: dict[str, dict] = {}
+    if user_id:
+        try:
+            progress = db.ielts_progress_get(
+                user_id, [w["word"] for w in all_words])
+        except Exception as e:
+            log.warning("ielts progress read failed: %s", e)
+    def _with_p(w):
+        p = progress.get(w["word"]) or {}
+        return {**w, "box": p.get("box", 0), "known": p.get("known", False)}
+    if user_id:
+        unmastered = [w for w in all_words
+                      if (progress.get(w["word"]) or {}).get("box", 0) < 3]
+        mastered = [w for w in all_words
+                    if (progress.get(w["word"]) or {}).get("box", 0) >= 3]
+        picked = [_with_p(w) for w in (unmastered + mastered)[:limit]]
+    else:
+        picked = [_with_p(w) for w in all_words[:limit]]
+    return {"items": picked, "total": len(all_words), "logged_in": bool(user_id)}
+
+
+class IeltsProgressIn(BaseModel):
+    word: str
+    known: bool
+
+
+@app.post("/api/ielts/progress")
+def api_ielts_progress(payload: IeltsProgressIn,
+                       user: db.User = Depends(auth.require_user)):
+    word = (payload.word or "").strip().lower()
+    if not word or len(word) > 64:
+        raise HTTPException(400, "word is required")
+    return db.ielts_progress_set(user.id, word, bool(payload.known))
+
+
+@app.get("/api/ielts/progress")
+def api_ielts_progress_list(user: db.User = Depends(auth.require_user)):
+    with db.get_session_local()() as ses:
+        rows = (ses.query(db.IeltsCardProgress)
+                .filter(db.IeltsCardProgress.user_id == user.id).all())
+        items = [{"word": r.word, "box": r.box or 0, "known": bool(r.known)}
+                 for r in rows]
+    return {"items": items,
+            "mastered": sum(1 for i in items if i["box"] >= 3)}
+
+
+class IeltsWritingIn(BaseModel):
+    question: str = ""
+    essay: str
+
+
+@app.post("/api/ielts/writing")
+def api_ielts_writing(payload: IeltsWritingIn, request: Request,
+                      user: db.User = Depends(auth.require_user)):
+    """Task 2 批改(需登录,走全局月度 AI 配额)。同步 def:阻塞调用进线程池。"""
+    essay = (payload.essay or "").strip()
+    if len(essay) < 50:
+        raise HTTPException(400, "essay too short (min 50 chars)")
+    if _quota_exceeded("deepseek", request):
+        return {"ok": False, "refused": False,
+                "content": "本月 AI 额度已用完,下月自动恢复。"}
+    info = deepseek_client.ielts_writing_feedback(payload.question, essay)
+    _record_usage("deepseek", info.get("usage_tokens") or 0, request)
+    return info
+
+
+class IeltsSpeakingIn(BaseModel):
+    part: int = 1
+    action: str = "start"          # start | answer | feedback
+    history: list[dict] = []
+
+
+@app.post("/api/ielts/speaking")
+def api_ielts_speaking(payload: IeltsSpeakingIn, request: Request,
+                       user: db.User = Depends(auth.require_user)):
+    """口语模拟一轮(需登录,走同一配额)。同步 def,理由同上。"""
+    action = (payload.action or "start").strip()
+    if action not in ("start", "answer", "feedback"):
+        raise HTTPException(400, "bad action")
+    history = payload.history[-24:]
+    for h in history:
+        if not isinstance(h, dict) or not isinstance(h.get("text", ""), str):
+            raise HTTPException(400, "bad history item")
+        h["text"] = h["text"].strip()[:2000]
+    if _quota_exceeded("deepseek", request):
+        return {"ok": False, "refused": False,
+                "content": "本月 AI 额度已用完,下月自动恢复。"}
+    info = deepseek_client.ielts_speaking_turn(history, payload.part, action)
+    _record_usage("deepseek", info.get("usage_tokens") or 0, request)
+    return info
 
 
 # ---------- API ----------

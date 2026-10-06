@@ -146,6 +146,49 @@ class ArticleSummary(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class IeltsCardProgress(Base):
+    """雅思闪卡自评进度 — 连续认识 3 次(box=3)即视为已掌握。
+    前端把掌握的卡移出默认复习池,但用户仍可翻全表。"""
+    __tablename__ = "ielts_card_progress"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    word = Column(String(128), nullable=False, index=True)
+    box = Column(Integer, default=0)            # 0~3:连续认识次数
+    known = Column(Boolean, default=False)      # 最近一次自评
+    last_seen = Column(DateTime, default=datetime.utcnow,
+                       onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "word", name="uq_ielts_card_one"),
+    )
+
+
+def ielts_progress_get(user_id: int, words: list[str]) -> dict[str, dict]:
+    """一批词的闪卡进度(word → {box, known})。"""
+    if not words:
+        return {}
+    with get_session_local()() as ses:
+        rows = (ses.query(IeltsCardProgress)
+                .filter(IeltsCardProgress.user_id == user_id,
+                        IeltsCardProgress.word.in_(words)).all())
+        return {r.word: {"box": r.box or 0, "known": bool(r.known)}
+                for r in rows}
+
+
+def ielts_progress_set(user_id: int, word: str, known: bool) -> dict:
+    """记录一次自评:认识则 box+1(封顶 3),不认识则清零。返回最新状态。"""
+    with get_session_local()() as ses:
+        row = ses.query(IeltsCardProgress).filter_by(
+            user_id=user_id, word=word).first()
+        if not row:
+            row = IeltsCardProgress(user_id=user_id, word=word)
+            ses.add(row)
+        row.box = min(3, (row.box or 0) + 1) if known else 0
+        row.known = bool(known)
+        ses.commit()
+        return {"word": word, "box": row.box, "known": bool(row.known)}
+
+
 def summaries_existing(keys: list[str]) -> set[str]:
     """返回 keys 里已有简介的那些(批量提交前过滤,幂等)。"""
     if not keys:

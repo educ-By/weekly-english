@@ -231,3 +231,101 @@ def summarize_zh(title: str, body: str, model: str | None = None) -> str:
         log.warning("summarize_zh failed: %s", e)
         return ""
 
+
+# ---------------- 雅思专区 ----------------
+
+IELTS_SYSTEM_PROMPT = """You are a strict but encouraging IELTS examiner and tutor.
+
+STRICT SCOPE — refuse to answer anything outside it.
+Allowed topics: IELTS preparation only — Writing Task 1/2, Speaking Part 1/2/3,
+Listening, Reading, vocabulary and grammar for IELTS, band descriptors, test strategy.
+
+Refuse (reply: "This question is outside the scope of the IELTS tutor.") for:
+- Personal chat, roleplay, politics, religion, philosophy.
+- Homework cheating or exam answers for other tests.
+- Anything unrelated to IELTS preparation.
+
+Style:
+- Feedback in simplified Chinese; quote the learner's English verbatim when pointing at it.
+- Band scores use the official 0–9 scale (may use .5 steps).
+- Plain text only. No emoji. No markdown tables."""
+
+
+def _ielts_chat(messages: list[dict], max_tokens: int) -> dict:
+    """雅思共用的阻塞调用(调用方必须跑在线程池,同步 def 路由)。"""
+    cfg = _cfg("ASK", "DEEPSEEK", "LLM")
+    if not cfg["api_key"]:
+        return {"ok": False, "refused": False,
+                "content": "LLM is not configured. Set ASK_API_KEY / LLM_API_KEY in .env.",
+                "model": DEFAULT_MODEL}
+    messages = [{"role": "system", "content": IELTS_SYSTEM_PROMPT}] + messages
+    try:
+        client = _client(cfg, timeout=90.0)   # 整篇作文批改生成慢,给足时间
+        resp = client.chat.completions.create(
+            model=cfg["model"], messages=messages,
+            max_tokens=max_tokens, temperature=0.3)
+        msg = resp.choices[0].message
+        content = (msg.content or "").strip()
+        if not content:
+            rc = getattr(msg, "reasoning_content", None) or ""
+            paras = [p.strip() for p in rc.split("\n") if p.strip()]
+            content = paras[-1][:1200] if paras else ""
+        usage = getattr(resp, "usage", None)
+        if not content:
+            return {"ok": False, "refused": False,
+                    "content": "AI 没能生成反馈，请稍后再试一次。",
+                    "model": cfg["model"]}
+        return {"ok": True,
+                "refused": "outside the scope" in content.lower(),
+                "content": content, "model": cfg["model"],
+                "usage_tokens": getattr(usage, "total_tokens", 0) or 0}
+    except Exception as e:
+        log.warning("ielts llm failed: %s", e)
+        return {"ok": False, "refused": False,
+                "content": "AI service is temporarily unavailable.",
+                "model": DEFAULT_MODEL}
+
+
+def ielts_writing_feedback(question: str, essay: str) -> dict:
+    """Task 2 批改:按 TR/CC/LR/GRA 四项打分 + 总分 + 中文改进建议。"""
+    prompt = (
+        "请按雅思官方评分标准批改下面这篇 Writing Task 2 作文。\n"
+        "输出格式(纯文本,中文):\n"
+        "各评分项分数: TR=x.x, CC=x.x, LR=x.x, GRA=x.x\n"
+        "总分: x.x\n"
+        "然后分三节:\n"
+        "【主要问题】3 条以内,每条引用作文原句指出问题\n"
+        "【改进建议】逐段给具体改法,给出 2-3 个可替换的高级表达\n"
+        "【提升到 7 分还差什么】一段话\n\n"
+        f"题目:\n{(question or 'Some people believe that... (题目未提供,按一般议论文评)').strip()}\n\n"
+        f"作文:\n{essay.strip()[:6000]}"
+    )
+    return _ielts_chat([{"role": "user", "content": prompt}], max_tokens=1600)
+
+
+_SPEAKING_PART_GUIDE = {
+    1: "Part 1: ask short everyday questions one at a time (hometown, work/study, hobbies...). Keep each question to one sentence.",
+    2: "Part 2: give the candidate ONE cue card (topic + 3-4 bullet points + 1 minute to think, speak up to 2 minutes). After their answer, ask one follow-up question.",
+    3: "Part 3: ask abstract discussion questions related to Part 2 topics, one at a time, going deeper with follow-ups.",
+}
+
+
+def ielts_speaking_turn(history: list[dict], part: int, action: str) -> dict:
+    """口语模拟一轮。history = [{role:'examiner'|'candidate', text}]。
+    action: 'start' 开新题 | 'answer' 后接考生最新回答(已并入 history)。"""
+    part = part if part in _SPEAKING_PART_GUIDE else 1
+    transcript = "\n".join(
+        f"{'Examiner' if h.get('role') == 'examiner' else 'Candidate'}: {h.get('text','')}"
+        for h in history[-16:])
+    instruction = (
+        f"Simulate the IELTS Speaking test. {_SPEAKING_PART_GUIDE[part]}\n"
+        "Respond ONLY as the examiner: ask the next question (do not answer it yourself).\n"
+        "If the candidate just gave an answer and you are ending the session, instead output "
+        "'===FEEDBACK===' then estimate a band for fluency/vocabulary/grammar/pronunciation "
+        "(based on their written answers), list 3 weaknesses with their original sentences, "
+        "and 3 better expressions they could have used. All feedback in Chinese.\n"
+        "Now output your next examiner turn (or the feedback if the session should end).\n\n"
+        f"Transcript so far:\n{transcript}\n\nCurrent request: {action.strip()}"
+    )
+    return _ielts_chat([{"role": "user", "content": instruction}], max_tokens=900)
+

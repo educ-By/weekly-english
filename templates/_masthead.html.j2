@@ -24,6 +24,9 @@
       <a class="nav-item{% if nav == 'archive' %} is-active{% endif %}" href="/archive"
          {% if nav == 'archive' %}aria-current="page"{% endif %}>Archive</a>
 
+      <a class="nav-item{% if nav[:5] == 'ielts' %} is-active{% endif %}" href="/ielts"
+         {% if nav[:5] == 'ielts' %}aria-current="page"{% endif %}>IELTS</a>
+
       <span class="nav-levels" role="group" aria-label="Browse by level">
         <span class="nav-levels-label">Level</span>
         {% for lv in ['B1', 'B2', 'C1'] %}

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IELTS · Weekly English</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}" />
+<link rel="stylesheet" href="{{ asset('ielts.css') }}" />
+</head>
+<body data-page="ielts">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">IELTS</span>
+  </nav>
+
+  <section class="cover cover-compact ielts-cover">
+    <div class="cover-kicker">IELTS Zone</div>
+    <h1 class="cover-title">雅思学习专区</h1>
+    <div class="cover-meta">
+      <span>{{ total_words }} core words</span><span class="dot"></span>
+      <span>AI writing &amp; speaking practice</span>
+    </div>
+    <p class="cover-blurb">围绕雅思考试的四项能力:用核心词表打底,闪卡自测巩固,
+    AI 批改写作、模拟口语考官。登录后可保存学习进度。</p>
+  </section>
+
+  <div class="cards ielts-entry-cards">
+    <a class="card ielts-card" href="/ielts/vocab">
+      <div class="card-head"><span class="src">Vocabulary</span><span class="chip ielts-chip">词表</span></div>
+      <h3 class="card-title">核心词汇</h3>
+      <p class="card-deck">{{ total_words }} 个雅思高频词,带音标、词性和中文释义,支持搜索,可一键收进生词本。</p>
+    </a>
+    <a class="card ielts-card" href="/ielts/flashcards">
+      <div class="card-head"><span class="src">Flashcards</span><span class="chip ielts-chip">闪卡</span></div>
+      <h3 class="card-title">闪卡自测</h3>
+      <p class="card-deck">看词想义,翻面核对,自评认识与否。连续认识 3 次自动移出复习池,进度云端保存。</p>
+    </a>
+    <a class="card ielts-card" href="/ielts/practice">
+      <div class="card-head"><span class="src">AI Practice</span><span class="chip ielts-chip">AI 练习</span></div>
+      <h3 class="card-title">写作批改 · 口语模拟</h3>
+      <p class="card-deck">Task 2 作文按官方四项标准打分给建议;口语 Part 1/2/3 模拟考官逐题问答。需登录。</p>
+    </a>
+  </div>
+
+  <section class="ielts-section">
+    <h2 class="home-h2">考试结构</h2>
+    <div class="ielts-grid">
+      <div class="ielts-fact"><h3>Listening 听力</h3><p>30 分钟 + 10 分钟誊写(纸笔)/ 直接作答(机考)。4 段独白与对话,40 题。</p></div>
+      <div class="ielts-fact"><h3>Reading 阅读</h3><p>60 分钟,3 篇长文,40 题。学术类文章选自期刊、书籍,不考专业知识。</p></div>
+      <div class="ielts-fact"><h3>Writing 写作</h3><p>60 分钟两篇:Task 1 描述图表(150 词),Task 2 议论文(250 词,占分更高)。</p></div>
+      <div class="ielts-fact"><h3>Speaking 口语</h3><p>11–14 分钟面对面/视频:Part 1 日常问答,Part 2 独白陈述,Part 3 深入讨论。</p></div>
+    </div>
+  </section>
+
+  <section class="ielts-section">
+    <h2 class="home-h2">评分与备考要点</h2>
+    <div class="ielts-tips">
+      <p><strong>9 分制</strong>:听力/阅读按对题数折算,写作/口语由考官按四项标准评 —— 写作看 Task Response、Coherence &amp; Cohesion、Lexical Resource、Grammatical Range;口语看 Fluency、Lexis、Grammar、Pronunciation。</p>
+      <p><strong>写作</strong>:Task 2 权重约为 Task 1 两倍,先保结构完整(立场—分段论证—让步—结论),再追求高级词汇;背模板句容易被判分低。</p>
+      <p><strong>口语</strong>:流利度优先于准确度,不会的词学会绕过去说;Part 2 准备一分钟要列提纲而不是写全文。</p>
+      <p><strong>词汇</strong>:本站词表取自学术词表与 B2/C1 高阶词汇,正是写作与阅读的核心盘;配合每周刊文章在语境里记忆效果最好。</p>
+    </div>
+  </section>
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="{{ asset('app.js') }}"></script>
+</body>
+</html>

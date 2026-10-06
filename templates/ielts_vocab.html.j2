@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vocabulary · IELTS · Weekly English</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}" />
+<link rel="stylesheet" href="{{ asset('ielts.css') }}" />
+</head>
+<body data-page="ielts-vocab">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <a href="/ielts">IELTS</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">Vocabulary</span>
+  </nav>
+
+  <section class="cover cover-compact ielts-cover">
+    <div class="cover-kicker">IELTS Vocabulary</div>
+    <h1 class="cover-title">核心词汇</h1>
+    <div class="cover-meta"><span>{{ total }} word{{ '' if total == 1 else 's' }}</span></div>
+    <p class="cover-blurb">学术词表 + B2/C1 高阶词合并去重,释义来自离线 ECDICT 词典。</p>
+  </section>
+
+  <nav class="level-switch" aria-label="IELTS pages">
+    <a class="chip ielts-chip is-on" href="/ielts/vocab">词表</a>
+    <a class="chip ielts-chip" href="/ielts/flashcards">闪卡自测</a>
+    <a class="chip ielts-chip" href="/ielts/practice">AI 练习</a>
+  </nav>
+
+  <form class="ielts-search" action="/ielts/vocab" method="get" role="search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search words…" aria-label="Search words" />
+    <button type="submit">Search</button>
+  </form>
+
+  {% if items %}
+  <ul class="ielts-wordlist">
+    {% for w in items %}
+    <li class="ielts-word" data-word="{{ w.word }}">
+      <div class="ielts-word-main">
+        <span class="ielts-word-text">{{ w.word }}</span>
+        {% if w.phonetic %}<span class="ielts-phon">/{{ w.phonetic }}/</span>{% endif %}
+        {% if w.pos %}<span class="ielts-pos">{{ w.pos }}</span>{% endif %}
+      </div>
+      {% if w.translation %}<p class="ielts-trans">{{ w.translation }}</p>{% endif %}
+      <div class="ielts-word-actions">
+        <button class="ielts-btn" type="button" data-act="say">🔊</button>
+        <button class="ielts-btn" type="button" data-act="save" title="加入生词本">+ 生词本</button>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No words match “{{ q }}”.</p>
+  {% endif %}
+
+  {% if pages > 1 %}
+  <nav class="ielts-pager" aria-label="Pages">
+    {% if pageno > 1 %}
+    <a class="ielts-page-link" href="/ielts/vocab?q={{ q }}&amp;page={{ pageno - 1 }}">‹ Prev</a>
+    {% endif %}
+    <span class="ielts-page-info">Page {{ pageno }} / {{ pages }}</span>
+    {% if pageno < pages %}
+    <a class="ielts-page-link" href="/ielts/vocab?q={{ q }}&amp;page={{ pageno + 1 }}">Next ›</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="{{ asset('app.js') }}"></script>
+<script src="{{ asset('ielts.js') }}"></script>
+</body>
+</html>

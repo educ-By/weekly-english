@@ -49,6 +49,8 @@ ASSET_VERSIONS: dict[str, int] = {
     "style.css": 40,
     "me.js": 4,
     "auth.js": 1,
+    "ielts.js": 1,
+    "ielts.css": 1,
 }
 
 # /static/app.js?v=41 这种形式;模板里统一用 asset('app.js') 生成。
@@ -57,7 +59,7 @@ ASSET_VERSIONS: dict[str, int] = {
 #   href="static/style.css?v=25"    —— 改造前遗留页面的相对路径
 # 用 lookbehind 卡住"引号紧跟其后",免得把 /issue/static/... 的 `/issue` 前缀吃掉。
 _ASSET_RE = re.compile(
-    r"(?<=[\"'])(/?static/)(app\.js|style\.css|me\.js|auth\.js)(?:\?v=[0-9]+)?"
+    r"(?<=[\"'])(/?static/)(app\.js|style\.css|me\.js|auth\.js|ielts\.js|ielts\.css)(?:\?v=[0-9]+)?"
 )
 
 

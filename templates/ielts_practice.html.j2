@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AI Practice · IELTS · Weekly English</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}" />
+<link rel="stylesheet" href="{{ asset('ielts.css') }}" />
+</head>
+<body data-page="ielts-practice">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <a href="/ielts">IELTS</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">AI Practice</span>
+  </nav>
+
+  <section class="cover cover-compact ielts-cover">
+    <div class="cover-kicker">AI Practice</div>
+    <h1 class="cover-title">写作批改 · 口语模拟</h1>
+    <div class="cover-meta"><span>需登录 · 共享月度 AI 额度</span></div>
+    <p class="cover-blurb">{% if ai_ready %}AI 已就绪。{% else %}AI 未配置,练习功能暂不可用。{% endif %}</p>
+  </section>
+
+  <nav class="level-switch" aria-label="IELTS pages">
+    <a class="chip ielts-chip" href="/ielts/vocab">词表</a>
+    <a class="chip ielts-chip" href="/ielts/flashcards">闪卡自测</a>
+    <a class="chip ielts-chip is-on" href="/ielts/practice">AI 练习</a>
+  </nav>
+
+  <div class="ielts-tabs" role="tablist">
+    <button class="ielts-tab is-on" type="button" role="tab" data-tab="writing">Writing Task 2</button>
+    <button class="ielts-tab" type="button" role="tab" data-tab="speaking">Speaking</button>
+  </div>
+
+  <section class="ielts-pane is-on" id="pane-writing">
+    <label class="ielts-label" for="wr-question">题目(可选)</label>
+    <textarea class="ielts-input" id="wr-question" rows="2"
+      placeholder="例如: Some people think universities should only offer places to students with the highest grades. To what extent do you agree?"></textarea>
+    <label class="ielts-label" for="wr-essay">你的作文(至少 50 词)</label>
+    <textarea class="ielts-input ielts-essay" id="wr-essay" rows="10"
+      placeholder="Paste or write your Task 2 essay here…"></textarea>
+    <button class="ielts-btn ielts-submit" type="button" id="wr-submit">批改</button>
+    <div class="ielts-output" id="wr-output" hidden></div>
+  </section>
+
+  <section class="ielts-pane" id="pane-speaking">
+    <div class="ielts-label">选择 Part:
+      <select class="ielts-input ielts-select" id="sp-part">
+        <option value="1">Part 1 · 日常问答</option>
+        <option value="2">Part 2 · 独白陈述</option>
+        <option value="3">Part 3 · 深入讨论</option>
+      </select>
+    </div>
+    <div class="sp-log" id="sp-log">
+      <p class="sp-empty">点击「开始」进入模拟考场。AI 扮演考官逐题提问,你用英文作答;想结束时点「结束并评分」。</p>
+    </div>
+    <textarea class="ielts-input" id="sp-input" rows="3" placeholder="Type your answer in English…"></textarea>
+    <div class="sp-actions">
+      <button class="ielts-btn ielts-submit" type="button" id="sp-start">开始</button>
+      <button class="ielts-btn ielts-submit" type="button" id="sp-send" hidden>回答</button>
+      <button class="ielts-btn" type="button" id="sp-end" hidden>结束并评分</button>
+    </div>
+  </section>
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="{{ asset('app.js') }}"></script>
+<script src="{{ asset('ielts.js') }}"></script>
+</body>
+</html>
