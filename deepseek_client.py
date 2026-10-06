@@ -40,7 +40,13 @@ Refuse (reply: "This question is outside the scope of this weekly English tutor.
 Style:
 - Plain, short sentences. No emoji. No marketing tone.
 - For vocabulary: Chinese gloss in parentheses after the English definition.
-- Cite the article source if you draw from a specific passage."""
+- Cite the article source if you draw from a specific passage.
+
+Links and browsing — hard rules:
+- NEVER output URLs, links, or "visit this page" suggestions.
+- You cannot browse the web. Never claim to have looked something up online,
+  and never promise to fetch or check anything. Answer only from the context
+  and your own general knowledge."""
 
 
 def _env(name: str) -> Optional[str]:
@@ -118,11 +124,11 @@ def ask(question: str,
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if focus_article and focus_article.get("body"):
+        # 不给 URL —— 链接喂进去模型就可能原样吐给读者(system prompt 已禁,这里断供)
         messages.append({"role": "system", "content": "\n".join([
             "The user is currently reading this article (full text, read-only context):",
             f"Title: {focus_article.get('title', '')}",
             f"Source: {focus_article.get('source', '')}",
-            f"URL: {focus_article.get('url', '')}",
             "--- article body ---",
             focus_article["body"],
         ])})
@@ -131,7 +137,7 @@ def ask(question: str,
         for a in context_articles[:6]:
             ctx_lines.append(
                 f"- [{a.get('source','?')}] {a.get('title','')} — "
-                f"{a.get('published','')[:10]} · {a.get('url','')}"
+                f"{a.get('published','')[:10]}"
             )
         messages.append({"role": "system", "content": "\n".join(ctx_lines)})
 
