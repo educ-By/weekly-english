@@ -76,12 +76,12 @@
       <label class="ielts-say-toggle"><input type="checkbox" id="sp-sound" checked /> 朗读考官问题</label>
     </div>
 
+    {% if pron_ready %}
     <p class="ielts-hint">
       考官问题会用语音朗读。作答方式是<strong>打字</strong>。
       想练发音就用下面的<strong>朗读评测</strong>:{{ pron_provider }}会逐词打分,并指出你读错、漏读的音素。
     </p>
 
-    {% if pron_ready %}
     <details class="sp-pron" id="sp-pron" open>
       <summary>朗读评测({{ pron_provider }})· 音素级发音打分</summary>
       <p class="ielts-count-hint">
