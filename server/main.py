@@ -8,6 +8,7 @@ FastAPI 主程序 — Weekly English 后端服务
   - APScheduler:每周一 07:00 自动刷新
 """
 from __future__ import annotations
+import base64
 import json
 import logging
 import os
@@ -36,6 +37,7 @@ import dict_client
 import db
 import auth
 import ielts
+import soe_client
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "data" / "output"
@@ -533,7 +535,8 @@ def ielts_flashcards_page(q: str = ""):
 def ielts_practice_page():
     html = _TPL_ENV.get_template("ielts_practice.html.j2").render(
         page="ielts-practice", nav="ielts",
-        ai_ready=deepseek_client.is_configured())
+        ai_ready=deepseek_client.is_configured(),
+        soe_ready=soe_client.is_configured())
     return HTMLResponse(html)
 
 
@@ -709,6 +712,43 @@ def api_ielts_speaking_list(user: db.User = Depends(auth.require_user)):
     return {"items": db.list_ielts_speaking(user.id)}
 
 
+class IeltsPronounceIn(BaseModel):
+    text: str = ""          # 参考文本(学生朗读的内容)
+    audio: str = ""         # base64 的 wav:16k / 单声道 / 16bit
+
+
+@app.post("/api/ielts/pronounce")
+def api_ielts_pronounce(payload: IeltsPronounceIn, request: Request,
+                        user: db.User = Depends(auth.require_user)):
+    """朗读发音评测(腾讯智聆)。需登录;按次数计月度上限。
+
+    这是全站唯一处理音频的接口 —— 前面所有 AI 路径都只有文字,评不了发音。
+    同步 def:SDK 调用是阻塞的,必须进线程池(理由同 /api/ask)。
+    """
+    if not soe_client.is_configured():
+        return {"ok": False, "content":
+                "发音评测未开通:服务器需要配置 TENCENT_SECRET_ID / TENCENT_SECRET_KEY。"}
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(400, "text is required")
+    audio_b64 = (payload.audio or "").strip()
+    if not audio_b64:
+        raise HTTPException(400, "audio is required")
+    if len(audio_b64) > 12_000_000:      # base64 ≈ 原始 ×1.33
+        raise HTTPException(413, "audio too large")
+    if _quota_exceeded("tencent_soe", request, SOE_MONTHLY_LIMIT):
+        return {"ok": False, "content": "本月发音评测次数已用完,下月自动恢复。"}
+    try:
+        audio = base64.b64decode(audio_b64, validate=True)
+    except Exception:
+        raise HTTPException(400, "audio must be valid base64")
+    info = soe_client.evaluate(audio, text)
+    # 只要真打到腾讯就算一次(失败也可能已计费);本地校验直接拒绝的不算
+    if info.get("ok") or info.get("code"):
+        _record_usage("tencent_soe", 1, request)
+    return info
+
+
 # ---------- API ----------
 @app.get("/api/issues")
 def api_issues():
@@ -717,6 +757,8 @@ def api_issues():
 
 # ---------- AI 月度配额(每模型 20 万 tokens;开发者账户不限) ----------
 AI_MONTHLY_TOKEN_LIMIT = int(os.environ.get("AI_MONTHLY_TOKEN_LIMIT", "200000"))
+# 智聆按调用次数计费,和 token 不是一个量纲,所以单独一个上限(1 次 = 计 1)
+SOE_MONTHLY_LIMIT = int(os.environ.get("SOE_MONTHLY_LIMIT", "1000"))
 DEVELOPER_EMAIL = os.environ.get("DEVELOPER_EMAIL", "1607045457@qq.com")
 
 
@@ -736,11 +778,14 @@ def _request_email(request: Request) -> str | None:
         return None
 
 
-def _quota_exceeded(provider: str, request: Request | None = None) -> bool:
+def _quota_exceeded(provider: str, request: Request | None = None,
+                    limit: int | None = None) -> bool:
+    """limit 省略时按 token 月配额;发音评测按次数,传自己的上限。"""
     if request is not None and _request_email(request) == DEVELOPER_EMAIL:
         return False   # 开发者账户无视限制
+    cap = AI_MONTHLY_TOKEN_LIMIT if limit is None else limit
     try:
-        return db.get_month_usage(provider) >= AI_MONTHLY_TOKEN_LIMIT
+        return db.get_month_usage(provider) >= cap
     except Exception as e:
         # 失败关闭:查不到用量就拒绝。放行等于配额失效,烧的是全局共享池。
         log.error("quota check failed for %s — refusing AI call: %s", provider, e)
@@ -840,6 +885,7 @@ def health():
     return {
         "ok": True,
         "deepseek_configured": deepseek_client.is_configured(),
+        "soe_configured": soe_client.is_configured(),
         "latest_issue": _latest_issue_key(),
         "db": db.get_database_url().split("://")[0],
         "jwt_secret_configured": auth.JWT_SECRET != "dev-only-secret-change-in-prod",

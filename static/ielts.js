@@ -88,6 +88,73 @@
     return m ? m.length : 0;
   }
 
+  /* ---------- 音频转码:任意录音 → 16k / 单声道 / 16bit WAV ----------
+     智聆只吃这个规格,而 MediaRecorder 给的是 webm/opus。用 Web Audio 解码后
+     交给 OfflineAudioContext 以 16k 重采样(浏览器自带的重采样质量够用),
+     再手写 WAV 头。全程在浏览器本地完成,不依赖服务器上的 ffmpeg。 */
+  async function toWav16k(blob) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!AC || !OAC) throw new Error("浏览器不支持音频转码");
+    const ctx = new AC();
+    let decoded;
+    try {
+      decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+    } finally {
+      if (ctx.close) ctx.close();
+    }
+    const rate = 16000;
+    const frames = Math.max(1, Math.ceil(decoded.duration * rate));
+    const off = new OAC(1, frames, rate);
+    const src = off.createBufferSource();
+    src.buffer = decoded;
+    src.connect(off.destination);
+    src.start();
+    const rendered = await off.startRendering();
+    return encodeWav16(rendered.getChannelData(0), rate);
+  }
+
+  function encodeWav16(samples, rate) {
+    const n = samples.length;
+    const buf = new ArrayBuffer(44 + n * 2);
+    const view = new DataView(buf);
+    const put = (off, str) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+    };
+    put(0, "RIFF");
+    view.setUint32(4, 36 + n * 2, true);
+    put(8, "WAVE");
+    put(12, "fmt ");
+    view.setUint32(16, 16, true);      // fmt 块长度
+    view.setUint16(20, 1, true);       // 1 = PCM
+    view.setUint16(22, 1, true);       // 单声道
+    view.setUint32(24, rate, true);
+    view.setUint32(28, rate * 2, true);  // 字节率
+    view.setUint16(32, 2, true);       // 块对齐
+    view.setUint16(34, 16, true);      // 位深
+    put(36, "data");
+    view.setUint32(40, n * 2, true);
+    let off = 44;
+    for (let i = 0; i < n; i++, off += 2) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    return new Blob([view], { type: "audio/wav" });
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const s = String(r.result || "");
+        const i = s.indexOf(",");
+        i >= 0 ? resolve(s.slice(i + 1)) : reject(new Error("读取音频失败"));
+      };
+      r.onerror = () => reject(new Error("读取音频失败"));
+      r.readAsDataURL(blob);
+    });
+  }
+
   // ---------------- 词表页 ----------------
   if (page === "ielts-vocab") {
     bindWordList();
@@ -778,6 +845,231 @@
       });
     } else if (spRec) {
       spRec.hidden = true;
+    }
+
+    /* ---------- 朗读评测(腾讯智聆):真的听音频,给音素级反馈 ----------
+       模板只在服务端配好了智聆时才渲染这一段,所以控件在就说明可用。 */
+    const prText = document.getElementById("pr-text");
+    if (prText) bindPronounce();
+
+    function bindPronounce() {
+      const prRecord = document.getElementById("pr-record");
+      const prEvalBtn = document.getElementById("pr-eval");
+      const prBox = document.getElementById("pr-box");
+      const prAudio = document.getElementById("pr-audio");
+      const prRedo = document.getElementById("pr-redo");
+      const prResult = document.getElementById("pr-result");
+      let prRecorder = null;
+      let prChunks = [];
+      let prBlob = null;
+      let prUrl = null;
+
+      const lastAnswer = () => {
+        for (let i = history.length - 1; i >= 0; i--) {
+          if (history[i].role === "candidate") return history[i].text;
+        }
+        return "";
+      };
+
+      function setStatus(text) {
+        document.getElementById("pr-status").textContent = text || "";
+      }
+
+      document.getElementById("pr-use-answer").addEventListener("click", () => {
+        const a = lastAnswer();
+        if (!a) { alertBox("pr-alert", "还没有回答可以引用,直接在框里输入要朗读的英文。", "warn"); return; }
+        prText.value = a;
+        alertBox("pr-alert", "");
+      });
+
+      document.getElementById("pr-say").addEventListener("click", () => {
+        const t = prText.value.trim();
+        if (!t) { alertBox("pr-alert", "先填要朗读的文本。", "warn"); return; }
+        say(t, "sp-sound");          // 先听一遍示范,再自己读
+      });
+
+      prRecord.addEventListener("click", async () => {
+        if (prRecorder && prRecorder.state === "recording") { prRecorder.stop(); return; }
+        if (!prText.value.trim()) {
+          alertBox("pr-alert", "先填要朗读的文本(可以点「用我的回答」)。", "warn");
+          return;
+        }
+        if (!navigator.mediaDevices || !window.MediaRecorder) {
+          alertBox("pr-alert", "这个浏览器不支持录音。", "err");
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          prChunks = [];
+          prBlob = null;
+          prRecorder = new MediaRecorder(stream);
+          prRecorder.ondataavailable = (ev) => { if (ev.data.size) prChunks.push(ev.data); };
+          prRecorder.onstop = () => {
+            stream.getTracks().forEach((t) => t.stop());
+            prBlob = new Blob(prChunks, { type: prRecorder.mimeType || "audio/webm" });
+            if (prUrl) URL.revokeObjectURL(prUrl);
+            prUrl = URL.createObjectURL(prBlob);
+            prAudio.src = prUrl;
+            prAudio.hidden = false;
+            prRedo.hidden = false;
+            prEvalBtn.hidden = false;
+            prRecord.textContent = "● 重录";
+            setStatus("录完了,先回听一遍,确认没问题再提交评测");
+          };
+          prRecorder.start();
+          prBox.hidden = false;
+          prAudio.hidden = true;
+          prRedo.hidden = true;
+          prEvalBtn.hidden = true;
+          prResult.hidden = true;
+          alertBox("pr-alert", "");
+          prRecord.textContent = "■ 停止朗读";
+          setStatus("录音中…读完点「停止朗读」");
+        } catch (e) {
+          alertBox("pr-alert", "拿不到麦克风权限。请允许本页使用麦克风后重试。", "err");
+        }
+      });
+
+      prRedo.addEventListener("click", () => {
+        prRecord.click();
+      });
+
+      prEvalBtn.addEventListener("click", async () => {
+        if (!prBlob) return;
+        const text = prText.value.trim();
+        if (!text) { alertBox("pr-alert", "先填要朗读的文本。", "warn"); return; }
+        const words = countWords(text);
+        if (words > 120) {
+          alertBox("pr-alert", "文本超过 120 词(" + words + " 词),请分几段分别评测。", "err");
+          return;
+        }
+        prEvalBtn.disabled = true;
+        prRecord.disabled = true;
+        alertBox("pr-alert", "");
+        prResult.hidden = false;
+        prResult.textContent = "转码并评测中…";
+        let out = null;
+        try {
+          const wav = await toWav16k(prBlob);
+          const b64 = await blobToBase64(wav);
+          setStatus("已转成 16k WAV(" + Math.round(wav.size / 1024) + " KB),正在评测…");
+          out = await postJSON("/api/ielts/pronounce", { text: text, audio: b64 });
+        } catch (e) {
+          out = { ok: false, content: "音频处理失败:" + (e && e.message ? e.message : "未知错误") };
+        } finally {
+          prEvalBtn.disabled = false;
+          prRecord.disabled = false;
+        }
+        if (!out || !out.ok) {
+          prResult.hidden = true;
+          const msg = failureText(out);
+          setStatus("");
+          if (msg) alertBox("pr-alert", msg, out && out.unauthorized ? "warn" : "err");
+          return;
+        }
+        setStatus("");
+        renderPronounce(prResult, out);
+      });
+    }
+
+    /* 测试用的暴露点:转码链和结果渲染没法用无麦克风的环境走一遍 UI,但可以直接
+       验输出规格与渲染结果。只用函数引用,生产逻辑不依赖它(与本文件既有的
+       __bt 钩子同一路数)。 */
+    window.__ieltsAudio = { toWav16k, encodeWav16, blobToBase64, countWords };
+    window.__ieltsPronRender = renderPronounce;
+
+    /* 分数的颜色档：≥80 好、60-79 一般、<60 差(0-100 分制,不是雅思 band) */
+    function scoreClass(v) {
+      if (v == null) return "";
+      if (v >= 80) return " is-good";
+      if (v >= 60) return " is-mid";
+      return " is-bad";
+    }
+
+    function renderPronounce(host, out) {
+      host.innerHTML = "";
+      host.hidden = false;
+
+      const wrap = el("div", "wr-scores");
+      if (out.score != null) {
+        const overall = el("div", "wr-overall");
+        overall.appendChild(el("span", "wr-overall-num" + scoreClass(out.score), String(out.score)));
+        overall.appendChild(el("span", "wr-overall-label", "总分 / 100"));
+        wrap.appendChild(overall);
+      }
+      const grid = el("div", "wr-score-grid");
+      [["准确度", out.accuracy, "发音是否准确(音素级)"],
+       ["流利度", out.fluency != null ? Math.round(out.fluency * 100) : null, "节奏与连贯(0-100)"],
+       ["完整度", out.completeness != null ? Math.round(out.completeness * 100) : null, "有没有漏读(0-100)"]]
+        .forEach(([label, v, tip]) => {
+          if (v == null) return;
+          const cell = el("div", "wr-score");
+          cell.appendChild(el("span", "wr-score-num" + scoreClass(v), String(v)));
+          cell.appendChild(el("span", "wr-score-label", label));
+          cell.title = tip;
+          grid.appendChild(cell);
+        });
+      wrap.appendChild(grid);
+      host.appendChild(wrap);
+
+      // 逐词:按分数着色,hover 看该词读错的音素
+      const words = out.words || [];
+      if (words.length) {
+        const block = el("div", "pr-block");
+        block.appendChild(el("h4", "wr-block-title", "逐词发音"));
+        const line = el("div", "pr-words");
+        words.forEach((w) => {
+          const bad = (w.mispronounced || []).length;
+          const span = el("span", "pr-word" + scoreClass(w.accuracy) + (bad ? " has-issue" : ""));
+          span.textContent = w.word;
+          const bits = [];
+          if (w.accuracy != null) bits.push("准确度 " + w.accuracy);
+          if (w.match != null && w.match !== 0) bits.push("匹配状态 " + w.match);
+          if (bad) {
+            bits.push(...w.mispronounced.map((p) =>
+              (p.reference && p.phone && p.reference !== p.phone)
+                ? "读成了 /" + p.phone + "/,应为 /" + p.reference + "/"
+                : "音素 /" + (p.phone || p.reference || "?") + "/ 不清晰"));
+          }
+          if (bits.length) span.title = bits.join(" · ");
+          line.appendChild(span);
+        });
+        block.appendChild(line);
+        host.appendChild(block);
+      }
+
+      // 读错的音素单独汇总 —— 这才是"真的听出问题"的地方
+      const issues = [];
+      words.forEach((w) => {
+        (w.mispronounced || []).forEach((p) => {
+          if (p.reference && p.phone && p.reference !== p.phone) {
+            issues.push({ word: w.word, said: p.phone, should: p.reference });
+          }
+        });
+      });
+      const weak = words.filter((w) => w.accuracy != null && w.accuracy < 60)
+        .map((w) => w.word);
+      const block = el("div", "pr-block");
+      block.appendChild(el("h4", "wr-block-title", "需要重点练的地方"));
+      if (!issues.length && !weak.length) {
+        block.appendChild(el("p", "wr-block-body",
+          "没有明显的音素错误,发音整体清楚。"));
+      } else {
+        const ul = document.createElement("ul");
+        ul.className = "pr-issues";
+        issues.slice(0, 12).forEach((it) => {
+          const li = document.createElement("li");
+          li.textContent = it.word + ":/" + it.should + "/ 读成了 /" + it.said + "/";
+          ul.appendChild(li);
+        });
+        if (weak.length) {
+          const li = document.createElement("li");
+          li.textContent = "发音含糊的词:" + weak.slice(0, 12).join("、");
+          ul.appendChild(li);
+        }
+        block.appendChild(ul);
+      }
+      host.appendChild(block);
     }
   }
 })();

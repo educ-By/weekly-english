@@ -77,9 +77,41 @@
     </div>
 
     <p class="ielts-hint">
-      考官问题会用语音朗读。作答方式是<strong>打字</strong>(或在本机录音自查发音)。
-      注意:文字作答只能评语法、词汇、句式与连贯 —— <strong>发音和流利度无法评估</strong>,反馈里不会给这两项的分数。
+      考官问题会用语音朗读。作答方式是<strong>打字</strong>。
+      想练发音就用下面的<strong>朗读评测</strong>:智聆会逐词打分,并指出你读错的音素。
     </p>
+
+    {% if soe_ready %}
+    <details class="sp-pron" id="sp-pron" open>
+      <summary>朗读评测(腾讯智聆)· 音素级发音打分</summary>
+      <p class="ielts-count-hint">
+        步骤:① 把你刚才的回答(或任意一句话)填进下面 → ② 对着麦克风朗读 → ③ 提交评测。
+        评测会给出总分、准确度、流利度,并逐词标出问题,读错的音素会单独列出。
+      </p>
+      <textarea class="ielts-input" id="pr-text" rows="3"
+        placeholder="要朗读的英文文本(最多 120 词,超出请分段)…"></textarea>
+      <div class="pr-actions">
+        <button class="ielts-btn" type="button" id="pr-use-answer">用我的回答</button>
+        <button class="ielts-btn" type="button" id="pr-say" title="听一遍示范发音">🔊 示范朗读</button>
+        <button class="ielts-btn ielts-submit" type="button" id="pr-record">● 开始朗读</button>
+        <button class="ielts-btn ielts-submit" type="button" id="pr-eval" hidden>提交评测</button>
+      </div>
+      <div class="sp-rec-box" id="pr-box" hidden>
+        <span class="ielts-count" id="pr-status">录音中…</span>
+        <audio id="pr-audio" controls hidden></audio>
+        <button class="ielts-btn" type="button" id="pr-redo" hidden>重录</button>
+        <span class="ielts-count-hint">录音只在你本机浏览器里转成 16k WAV 后提交评测,不做别用。</span>
+      </div>
+      <div class="ielts-alert" id="pr-alert" hidden></div>
+      <div id="pr-result" hidden></div>
+    </details>
+    {% else %}
+    <p class="ielts-hint">
+      发音评测未开通 —— 需要在服务器上配置腾讯云密钥
+      (<code>TENCENT_SECRET_ID</code> / <code>TENCENT_SECRET_KEY</code>)。
+      开通后可对着麦克风朗读,智聆会逐词打分并指出读错的音素。
+    </p>
+    {% endif %}
 
     <div class="sp-timer" id="sp-timer" hidden>
       <span class="sp-timer-label" id="sp-timer-label">准备</span>
@@ -98,8 +130,11 @@
       <button class="ielts-btn ielts-submit" type="button" id="sp-send" hidden>回答</button>
       <button class="ielts-btn" type="button" id="sp-end" hidden>结束并评分</button>
       <button class="ielts-btn" type="button" id="sp-mic" hidden title="用语音输入(取决于浏览器支持)">🎤 语音输入</button>
+      {% if not soe_ready %}
       <button class="ielts-btn" type="button" id="sp-rec" hidden title="在本机录音,自己回听发音">● 录音自查</button>
+      {% endif %}
     </div>
+
     <div class="sp-rec-box" id="sp-rec-box" hidden>
       <span class="ielts-count" id="sp-rec-status">录音中…</span>
       <audio id="sp-rec-audio" controls hidden></audio>

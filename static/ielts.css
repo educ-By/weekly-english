@@ -221,6 +221,32 @@
 .wr-block-title { margin: 0 0 .3rem; font-size: .95rem; color: #a63a3a; }
 .wr-block-body { margin: 0; white-space: pre-wrap; line-height: 1.7; font-size: .93rem; }
 
+/* ---------- 朗读评测(智聆) ---------- */
+.sp-pron {
+  margin: .9rem 0; padding: .8rem 1rem; background: #fbf9f4;
+  border: 1px solid #e8e0d4; border-radius: 8px;
+}
+.sp-pron > summary { cursor: pointer; font-weight: 600; color: #a63a3a; font-size: .95rem; }
+.sp-pron .ielts-input { margin: .5rem 0; }
+.pr-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: .5rem; }
+.pr-actions .ielts-submit { margin-top: 0; }
+#pr-result { margin-top: 1rem; }
+.pr-block { margin-top: 1rem; }
+.pr-words { display: flex; flex-wrap: wrap; gap: .35rem; }
+.pr-word {
+  padding: .1rem .45rem; border-radius: 5px; font-size: .92rem;
+  background: #f3f1eb; border: 1px solid #e0dbcd;
+}
+.pr-word.is-good { background: #f1f8f2; border-color: #cbe3cd; color: #2e7d32; }
+.pr-word.is-mid { background: #fdf8ec; border-color: #eddfb8; color: #8a6d1f; }
+.pr-word.is-bad { background: #fdf3f3; border-color: #f0c9c9; color: #a63a3a; font-weight: 600; }
+.pr-word.has-issue { border-bottom-width: 3px; border-bottom-style: double; }
+.pr-issues { margin: .4rem 0 0; padding-left: 1.2rem; }
+.pr-issues li { font-size: .9rem; line-height: 1.8; }
+.wr-score-num.is-good, .wr-overall-num.is-good { color: #2e7d32; }
+.wr-score-num.is-mid, .wr-overall-num.is-mid { color: #8a6d1f; }
+.wr-score-num.is-bad, .wr-overall-num.is-bad { color: #a63a3a; }
+
 /* ---------- 个人页雅思区块 ---------- */
 .ielts-me-flash { display: flex; flex-wrap: wrap; gap: .6rem; align-items: baseline; }
 .ielts-me-num { font-size: 1.6rem; font-weight: 700; color: #a63a3a; }

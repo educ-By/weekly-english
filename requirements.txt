@@ -13,6 +13,11 @@ apscheduler>=3.10
 python-dotenv>=1.0
 openai>=1.30            # DeepSeek API client (OpenAI-compatible)
 
+# 发音评测(雅思专区口语)—— 腾讯云智聆 SOE
+# 用官方 SDK 而不是手写 TC3 签名:没有密钥时签名没法本地验证,签错的表现是整个
+# 功能静默失败,风险太大
+tencentcloud-sdk-python-soe>=3.0.1459
+
 # Database & auth
 sqlalchemy>=2.0
 psycopg[binary]>=3.1    # Postgres driver (Neon compatible)

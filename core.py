@@ -49,8 +49,8 @@ ASSET_VERSIONS: dict[str, int] = {
     "style.css": 41,
     "me.js": 5,
     "auth.js": 1,
-    "ielts.js": 2,
-    "ielts.css": 2,
+    "ielts.js": 3,
+    "ielts.css": 3,
 }
 
 # /static/app.js?v=41 这种形式;模板里统一用 asset('app.js') 生成。
