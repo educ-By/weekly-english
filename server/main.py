@@ -1142,6 +1142,13 @@ def _background_refresh_once():
     except Exception as e:
         log.warning("Rare-word refresh failed: %s", e)
 
+    # 1b2) 导航新增了雅思专区入口 —— 老页面的导航是渲染那一刻烙进去的,
+    #      landing 又不会因它重建,就地补上(不联网)
+    try:
+        core.refresh_nav_links(OUT_DIR)
+    except Exception as e:
+        log.warning("Nav link refresh failed: %s", e)
+
     # 1c) 离线词典:首次启动从 gz 建 sqlite(几秒),放到后台做,别让第一个
     #     查词的请求去等建索引
     try:

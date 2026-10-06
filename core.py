@@ -134,6 +134,42 @@ def refresh_asset_versions(out_dir: Path) -> int:
     return changed
 
 
+# 导航新增栏目时,已落盘的成品页是渲染那一刻的旧导航(没有这个链接),而 landing
+# 只在 catalog 缺失/历史期迁移时才重建 —— 线上卷上这两条都不成立,首页就永远
+# 看不到新入口。这里按 refresh_asset_versions 的同一套路就地补一刀:不重渲染、
+# 不联网,只往缺链接的页里插一段与模板完全一致的锚点。
+_NAV_LEVELS_MARK = '<span class="nav-levels"'
+_IELTS_NAV_ANCHOR = ('<a class="nav-item" href="/ielts"\n'
+                     '>IELTS</a>\n\n      ')
+_IELTS_NAV_HREF = 'href="/ielts"'
+
+
+def refresh_nav_links(out_dir: Path) -> int:
+    """给已渲染的页面补上导航里的雅思入口(幂等;已有链接的页面跳过)。"""
+    if not out_dir.exists():
+        return 0
+    changed = 0
+    for page in out_dir.rglob("*.html"):
+        try:
+            txt = page.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        if _IELTS_NAV_HREF in txt or _NAV_LEVELS_MARK not in txt:
+            continue
+        new = txt.replace(_NAV_LEVELS_MARK,
+                          _IELTS_NAV_ANCHOR + _NAV_LEVELS_MARK, 1)
+        if new == txt:
+            continue
+        try:
+            page.write_text(new, encoding="utf-8")
+            changed += 1
+        except Exception as e:
+            log.warning("Nav link rewrite failed for %s: %s", page, e)
+    if changed:
+        log.info("Refreshed nav links: %d page(s)", changed)
+    return changed
+
+
 # 生词块("Out-of-scope vocabulary")—— 模板 article.html.j2 生成,就地重算时整块重写
 _RARE_BLOCK_RE = re.compile(r'<details class="rare-words">.*?</details>', re.S)
 _RARE_WORD_RE = re.compile(r'data-word="([^"]*)"')
