@@ -88,8 +88,8 @@
         步骤:① 把你刚才的回答(或任意一句话)填进下面 → ② 对着麦克风朗读 → ③ 提交评测。
         评测会给出总分、准确度、流利度、完整度,并逐词标出问题:读错和漏读的音素会单独列出。
       </p>
-      <textarea class="ielts-input" id="pr-text" rows="3"
-        placeholder="要朗读的英文文本(最多 120 词,超出请分段)…"></textarea>
+      <textarea class="ielts-input" id="pr-text" rows="3" data-max-words="{{ pron_max_words }}"
+        placeholder="要朗读的英文文本(最多 {{ pron_max_words }} 词,超出请分段)…"></textarea>
       <div class="pr-actions">
         <button class="ielts-btn" type="button" id="pr-use-answer">用我的回答</button>
         <button class="ielts-btn" type="button" id="pr-say" title="听一遍示范发音">🔊 示范朗读</button>

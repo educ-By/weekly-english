@@ -938,9 +938,12 @@
         if (!prBlob) return;
         const text = prText.value.trim();
         if (!text) { alertBox("pr-alert", "先填要朗读的文本。", "warn"); return; }
+        // 上限由服务端下发(讯飞句子模式 30 词,开了篇章权限才 120),别在前端写死
+        const maxWords = parseInt(prText.dataset.maxWords || "30", 10);
         const words = countWords(text);
-        if (words > 120) {
-          alertBox("pr-alert", "文本超过 120 词(" + words + " 词),请分几段分别评测。", "err");
+        if (words > maxWords) {
+          alertBox("pr-alert", "文本超过 " + maxWords + " 词(" + words +
+            " 词)。请拆成短句分开读——分段读更容易看清每个音的得分。", "err");
           return;
         }
         prEvalBtn.disabled = true;

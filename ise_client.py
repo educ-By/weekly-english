@@ -37,8 +37,8 @@ ISE_PATH = "/v2/open-ise"
 ISE_URL = f"wss://{ISE_HOST}{ISE_PATH}"
 
 FRAME_SIZE = 1280                 # 官方客户端同款分片大小
-SENTENCE_MAX_WORDS = 30           # 讯飞:句子模式 ≤30 词
-PARAGRAPH_MAX_WORDS = 120         # 篇章模式 ≤120 词(留余量,官方上限更宽)
+SENTENCE_MAX_WORDS = 30           # 句子模式:≤30 词(免费额度内可用)
+PARAGRAPH_MAX_WORDS = 120         # 篇章模式:≤120 词,但需要额外申请「篇章」权限
 MAX_AUDIO_BYTES = 6 * 1024 * 1024
 CONNECT_TIMEOUT = 15
 RECV_TIMEOUT = 30
@@ -76,16 +76,36 @@ def word_count(text: str) -> int:
     return len(re.findall(r"[A-Za-z0-9'’-]+", text or ""))
 
 
+def allow_chapter() -> bool:
+    """篇章题型(read_chapter)是讯飞的高阶权限,要单独申请购买,默认关。
+
+    不申请就用篇章会直接报错,所以默认只走句子模式,超过 30 词就明确让人分段 ——
+    比抛一个看不懂的错误码好。
+    """
+    return _env("XFYUN_ALLOW_CHAPTER") in ("1", "true", "yes")
+
+
+def max_words() -> int:
+    return PARAGRAPH_MAX_WORDS if allow_chapter() else SENTENCE_MAX_WORDS
+
+
 def pick_category(text: str) -> tuple[str, str]:
-    """按长度选评测题型;超长返回 ("", 原因)。"""
+    """选评测题型;超长返回 ("", 原因)。
+
+    默认只用句子模式(免费额度内可用);开了 XFYUN_ALLOW_CHAPTER 才用篇章模式。
+    """
     n = word_count(text)
     if n == 0:
         return "", "参考文本是空的"
     if n <= SENTENCE_MAX_WORDS:
         return "read_sentence", ""
-    if n <= PARAGRAPH_MAX_WORDS:
+    if allow_chapter() and n <= PARAGRAPH_MAX_WORDS:
         return "read_chapter", ""
-    return "", f"朗读文本太长(现在 {n} 词,上限 {PARAGRAPH_MAX_WORDS} 词),请分几段评测"
+    if allow_chapter():
+        return "", (f"朗读文本太长(现在 {n} 词,上限 {PARAGRAPH_MAX_WORDS} 词),"
+                    "请分几段评测")
+    return "", (f"一次最多评测 {SENTENCE_MAX_WORDS} 词(现在 {n} 词)。"
+                "请拆成短句分开读——分段读反而更容易看清每个音的得分。")
 
 
 def _pcm_from_wav(data: bytes) -> tuple[bytes, str]:

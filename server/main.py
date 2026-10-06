@@ -539,7 +539,9 @@ def ielts_practice_page():
         ai_ready=deepseek_client.is_configured(),
         pron_ready=bool(pronounce_provider()),
         pron_provider=("讯飞语音评测" if pronounce_provider() == "xfyun"
-                       else "腾讯智聆" if pronounce_provider() == "soe" else ""))
+                       else "腾讯智聆" if pronounce_provider() == "soe" else ""),
+        pron_max_words=(ise_client.max_words() if pronounce_provider() == "xfyun"
+                        else 120))
     return HTMLResponse(html)
 
 

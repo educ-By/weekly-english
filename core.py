@@ -49,7 +49,7 @@ ASSET_VERSIONS: dict[str, int] = {
     "style.css": 41,
     "me.js": 5,
     "auth.js": 1,
-    "ielts.js": 4,
+    "ielts.js": 5,
     "ielts.css": 3,
 }
 
