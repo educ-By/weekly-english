@@ -13,9 +13,11 @@ apscheduler>=3.10
 python-dotenv>=1.0
 openai>=1.30            # DeepSeek API client (OpenAI-compatible)
 
-# 发音评测(雅思专区口语)—— 腾讯云智聆 SOE
-# 用官方 SDK 而不是手写 TC3 签名:没有密钥时签名没法本地验证,签错的表现是整个
-# 功能静默失败,风险太大
+# 发音评测(雅思专区口语)
+# 主用讯飞语音评测(ISE):国内平台里唯一明确不要求成年的(协议写明未满18岁可在
+# 监护人陪同下使用),给英文音节/音素级评分。走 WebSocket。
+websocket-client>=1.7
+# 备用:腾讯云智聆 SOE(需年满18岁实名)。保留但默认不用,见 soe_client.py
 tencentcloud-sdk-python-soe>=3.0.1459
 
 # Database & auth

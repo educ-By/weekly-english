@@ -238,6 +238,11 @@ def _normalize(resp) -> dict:
         fluency = None
     if completeness is not None and completeness < 0:
         completeness = None
+    # 统一成百分制:智聆这两项是 0-1,而讯飞是 0-100,前端按一个口径渲染
+    if fluency is not None:
+        fluency = round(fluency * 100, 1)
+    if completeness is not None:
+        completeness = round(completeness * 100, 1)
 
     return {"ok": True, "score": score, "accuracy": accuracy,
             "fluency": fluency, "completeness": completeness,

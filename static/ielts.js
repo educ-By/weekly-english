@@ -998,9 +998,11 @@
         wrap.appendChild(overall);
       }
       const grid = el("div", "wr-score-grid");
+      // 约定:后端把准确度/流利度/完整度统一成百分制(0-100),前端不再换算。
+      // 以前这里对腾讯的 0-1 分数乘了 100,换成讯飞(0-100)后就会显示成 8120。
       [["准确度", out.accuracy, "发音是否准确(音素级)"],
-       ["流利度", out.fluency != null ? Math.round(out.fluency * 100) : null, "节奏与连贯(0-100)"],
-       ["完整度", out.completeness != null ? Math.round(out.completeness * 100) : null, "有没有漏读(0-100)"]]
+       ["流利度", out.fluency, "节奏与连贯(0-100)"],
+       ["完整度", out.completeness, "有没有漏读(0-100)"]]
         .forEach(([label, v, tip]) => {
           if (v == null) return;
           const cell = el("div", "wr-score");
@@ -1024,12 +1026,14 @@
           span.textContent = w.word;
           const bits = [];
           if (w.accuracy != null) bits.push("准确度 " + w.accuracy);
-          if (w.match != null && w.match !== 0) bits.push("匹配状态 " + w.match);
           if (bad) {
-            bits.push(...w.mispronounced.map((p) =>
-              (p.reference && p.phone && p.reference !== p.phone)
+            bits.push(...w.mispronounced.map((p) => {
+              // 两种来源:讯飞给"错误类型"(漏读/读错/增读…),腾讯给"实际读成的音素"
+              if (p.kind) return (p.phone ? "音素 /" + p.phone + "/ " : "") + p.kind;
+              return (p.reference && p.phone && p.reference !== p.phone)
                 ? "读成了 /" + p.phone + "/,应为 /" + p.reference + "/"
-                : "音素 /" + (p.phone || p.reference || "?") + "/ 不清晰"));
+                : "音素 /" + (p.phone || p.reference || "?") + "/ 不清晰";
+            }));
           }
           if (bits.length) span.title = bits.join(" · ");
           line.appendChild(span);
@@ -1042,8 +1046,10 @@
       const issues = [];
       words.forEach((w) => {
         (w.mispronounced || []).forEach((p) => {
-          if (p.reference && p.phone && p.reference !== p.phone) {
-            issues.push({ word: w.word, said: p.phone, should: p.reference });
+          if (p.kind) {
+            issues.push({ word: w.word, text: (p.phone ? "/" + p.phone + "/ " : "") + p.kind });
+          } else if (p.reference && p.phone && p.reference !== p.phone) {
+            issues.push({ word: w.word, text: "/" + p.reference + "/ 读成了 /" + p.phone + "/" });
           }
         });
       });
@@ -1053,13 +1059,13 @@
       block.appendChild(el("h4", "wr-block-title", "需要重点练的地方"));
       if (!issues.length && !weak.length) {
         block.appendChild(el("p", "wr-block-body",
-          "没有明显的音素错误,发音整体清楚。"));
+          "没有检测到读错或漏读的音素,发音整体清楚。"));
       } else {
         const ul = document.createElement("ul");
         ul.className = "pr-issues";
-        issues.slice(0, 12).forEach((it) => {
+        issues.slice(0, 14).forEach((it) => {
           const li = document.createElement("li");
-          li.textContent = it.word + ":/" + it.should + "/ 读成了 /" + it.said + "/";
+          li.textContent = it.word + ":" + it.text;
           ul.appendChild(li);
         });
         if (weak.length) {
@@ -1070,6 +1076,11 @@
         block.appendChild(ul);
       }
       host.appendChild(block);
+      if (out.note) {
+        const note = el("p", "ielts-count-hint");
+        note.textContent = out.note;
+        host.appendChild(note);
+      }
     }
   }
 })();
