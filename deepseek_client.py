@@ -49,6 +49,8 @@ Style:
 - Be economical. Give the shortest reply that still fully helps: no restating the
   question, no preamble, no summary of what you are about to say, no filler, no
   closing pleasantries.
+- Think briefly. Decide and answer; do not deliberate at length or re-check your own
+  output.
 - Plain, short sentences. No emoji. No marketing tone.
 - For vocabulary: Chinese gloss in parentheses after the English definition.
 - Cite the article source if you draw from a specific passage.
@@ -274,7 +276,12 @@ You only ever receive a written transcript. You cannot hear the candidate, so yo
 must never score, estimate or guess Pronunciation or Fluency. Assess only what the
 text supports: grammatical accuracy, lexical range and appropriacy, sentence
 structure, coherence and idea development, task response. State plainly that
-pronunciation and fluency need a recording and are out of scope in this mode."""
+pronunciation and fluency need a recording and are out of scope in this mode.
+
+Thinking — keep it short:
+- Decide quickly and output the result. Do not deliberate at length, do not analyze
+  the material sentence by sentence, and do not re-check or revise your own output.
+- Do not put scoring reasoning in the visible answer."""
 
 
 def _ielts_chat(messages: list[dict], max_tokens: int,
@@ -314,17 +321,17 @@ def _ielts_chat(messages: list[dict], max_tokens: int,
                 "model": DEFAULT_MODEL}
 
 
-def ielts_writing_feedback(question: str, essay: str) -> dict:
-    """Task 2 批改:按 TR/CC/LR/GRA 四项打分 + 总分 + 中文改进建议。
+# 提示词层面压思考量的具体措辞。思考型模型的思考长度没有直接参数可调,
+# 能试的只有明确要求它别展开推理、别自我检查。效果量化在
+# tools/measure_ielts_tokens.py(改动前后各跑 3 次对比)。
+_ECONOMY_RULES = (
+    "直接下结论:不要在推理里逐句分析作文,不要反复权衡,也不要回头检查自己写过什么。",
+    "评分按 字数是否达标 / 分段与连接 / 词汇 / 语法 四项快速定档即可,不要为每项找证据链。",
+)
 
-    分数单独一行输出,由 _split_scores 解析出来供前端渲染成分数卡。单次调用不设
-    人为上限(见 MAX_OUTPUT_TOKENS):模型思考也要吃 tokens,预算给得比思考量还小
-    时 content 会被截成一句残片、分数行整个丢失 —— 这是之前批改坏掉的根因。现在
-    长度靠提示词要求精简,成本靠每月总配额兜底。
 
-    只在"格式没解析出来"时重问一次:那是正确性问题(拿不到分数行前端就只能退回
-    纯文本),不是预算问题。思考流不是答案,所以关掉 reasoning 兜底。
-    """
+def _writing_prompt(question: str, essay: str, note: str = "") -> str:
+    """Task 2 批改的完整 prompt(生产与 tools/measure_ielts_tokens.py 共用一处)。"""
     head = (
         "直接输出批改结果,不要复述下面的要求。\n"
         "**第一行必须严格是这个格式,不要加别的内容**:\n"
@@ -338,6 +345,21 @@ def ielts_writing_feedback(question: str, essay: str) -> dict:
     )
     tail = (f"题目:\n{(question or 'Some people believe that... (题目未提供,按一般议论文评)').strip()}\n\n"
             f"作文:\n{essay.strip()[:6000]}")
+    return ("请按雅思官方评分标准批改下面这篇 Writing Task 2 作文。\n"
+            + "\n".join(_ECONOMY_RULES) + "\n\n" + head + note + tail)
+
+
+def ielts_writing_feedback(question: str, essay: str) -> dict:
+    """Task 2 批改:按 TR/CC/LR/GRA 四项打分 + 总分 + 中文改进建议。
+
+    分数单独一行输出,由 _split_scores 解析出来供前端渲染成分数卡。单次调用不设
+    人为上限(见 MAX_OUTPUT_TOKENS):模型思考也要吃 tokens,预算给得比思考量还小
+    时 content 会被截成一句残片、分数行整个丢失 —— 这是之前批改坏掉的根因。
+    现在长度和思考量都靠提示词要求精简,成本靠每月总配额兜底。
+
+    只在"格式没解析出来"时重问一次:那是正确性问题(拿不到分数行前端就只能退回
+    纯文本),不是预算问题。思考流不是答案,所以关掉 reasoning 兜底。
+    """
     cfg = _cfg("ASK", "DEEPSEEK", "LLM")
     info: dict = {}
     best = ""
@@ -347,9 +369,7 @@ def ielts_writing_feedback(question: str, essay: str) -> dict:
             "\n注意:上一次的第一行不是 SCORES 那一行。请让**第一行**就是 "
             "SCORES: TR=...|CC=...|LR=...|GRA=...|OA=... ,然后才是三节建议。")
         info = _ielts_chat(
-            [{"role": "user", "content":
-              "请按雅思官方评分标准批改下面这篇 Writing Task 2 作文。\n"
-              + head + note + tail}],
+            [{"role": "user", "content": _writing_prompt(question, essay, note)}],
             max_tokens=MAX_OUTPUT_TOKENS, reasoning_fallback=False)
         if not info.get("ok") or info.get("refused"):
             return info
