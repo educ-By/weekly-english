@@ -45,12 +45,12 @@ RENDER_MIGRATE_VERSION = 1
 # 所以启动时会用 refresh_asset_versions() 就地重写这些引用;否则老用户
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
-    "app.js": 49,
-    "style.css": 40,
-    "me.js": 4,
+    "app.js": 50,
+    "style.css": 41,
+    "me.js": 5,
     "auth.js": 1,
-    "ielts.js": 1,
-    "ielts.css": 1,
+    "ielts.js": 2,
+    "ielts.css": 2,
 }
 
 # /static/app.js?v=41 这种形式;模板里统一用 asset('app.js') 生成。

@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="{{ asset('style.css') }}" />
 <link rel="stylesheet" href="{{ asset('ielts.css') }}" />
 </head>
-<body data-page="ielts-vocab">
+<body data-page="ielts-vocab" data-q="{{ q }}">
 
 {% include "_masthead.html.j2" %}
 
@@ -24,8 +24,12 @@
   <section class="cover cover-compact ielts-cover">
     <div class="cover-kicker">IELTS Vocabulary</div>
     <h1 class="cover-title">核心词汇</h1>
-    <div class="cover-meta"><span>{{ total }} word{{ '' if total == 1 else 's' }}</span></div>
-    <p class="cover-blurb">学术词表 + B2/C1 高阶词合并去重,释义来自离线 ECDICT 词典。</p>
+    <div class="cover-meta">
+      <span id="vw-total">{{ total }} word{{ '' if total == 1 else 's' }}</span>
+      <span class="dot" id="vw-mastered-wrap" hidden></span>
+      <span id="vw-mastered" hidden></span>
+    </div>
+    <p class="cover-blurb">学术词表 + B2/C1 高阶词合并去重,音标、词性与释义来自离线 ECDICT 词典。</p>
   </section>
 
   <nav class="level-switch" aria-label="IELTS pages">
@@ -34,43 +38,65 @@
     <a class="chip ielts-chip" href="/ielts/practice">AI 练习</a>
   </nav>
 
-  <form class="ielts-search" action="/ielts/vocab" method="get" role="search">
-    <input type="search" name="q" value="{{ q }}" placeholder="Search words…" aria-label="Search words" />
-    <button type="submit">Search</button>
-  </form>
+  <div class="ielts-controls">
+    <form class="ielts-search" action="/ielts/vocab" method="get" role="search" id="vw-form">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search words…"
+             aria-label="Search words" id="vw-input" autocomplete="off" />
+      <button type="submit">Search</button>
+    </form>
+    <label class="ielts-say-toggle">
+      <input type="checkbox" id="vw-sound" checked /> 发音
+    </label>
+    <a class="ielts-btn ielts-drill-link" id="vw-drill"
+       href="/ielts/flashcards{% if q %}?q={{ q }}{% endif %}">用这批词练闪卡</a>
+  </div>
 
-  {% if items %}
-  <ul class="ielts-wordlist">
-    {% for w in items %}
-    <li class="ielts-word" data-word="{{ w.word }}">
-      <div class="ielts-word-main">
-        <span class="ielts-word-text">{{ w.word }}</span>
-        {% if w.phonetic %}<span class="ielts-phon">/{{ w.phonetic }}/</span>{% endif %}
-        {% if w.pos %}<span class="ielts-pos">{{ w.pos }}</span>{% endif %}
-      </div>
-      {% if w.translation %}<p class="ielts-trans">{{ w.translation }}</p>{% endif %}
-      <div class="ielts-word-actions">
-        <button class="ielts-btn" type="button" data-act="say">🔊</button>
-        <button class="ielts-btn" type="button" data-act="save" title="加入生词本">+ 生词本</button>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="empty">No words match “{{ q }}”.</p>
-  {% endif %}
+  <div id="vw-words">
+    {% if items %}
+    <ul class="ielts-wordlist">
+      {% for w in items %}
+      <li class="ielts-word" data-word="{{ w.word }}">
+        <div class="ielts-word-main">
+          <span class="ielts-word-text">{{ w.word }}</span>
+          {% if w.phonetic %}<span class="ielts-phon">/{{ w.phonetic }}/</span>{% endif %}
+          {% if w.tags %}<span class="ielts-pos">{{ w.tags | join(' · ') }}</span>{% endif %}
+          <span class="ielts-box" hidden></span>
+        </div>
+        {% if w.translation %}<p class="ielts-trans">{{ w.translation }}</p>{% endif %}
+        <div class="ielts-word-actions">
+          <button class="ielts-btn" type="button" data-act="say" title="发音">🔊</button>
+          <button class="ielts-btn" type="button" data-act="save" title="加入生词本">+ 生词本</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">No words match “{{ q }}”.</p>
+    {% endif %}
+  </div>
 
-  {% if pages > 1 %}
-  <nav class="ielts-pager" aria-label="Pages">
-    {% if pageno > 1 %}
-    <a class="ielts-page-link" href="/ielts/vocab?q={{ q }}&amp;page={{ pageno - 1 }}">‹ Prev</a>
+  <nav class="ielts-pager" aria-label="Pages" id="vw-pager">
+    {% if pages > 1 %}
+      {% if pageno > 1 %}
+      <a class="ielts-page-link" href="/ielts/vocab?q={{ q }}&amp;page={{ pageno - 1 }}">‹ Prev</a>
+      {% endif %}
+      {% for p in range(1, pages + 1) %}
+        {% if p == pageno %}
+        <span class="ielts-page-link is-on" aria-current="page">{{ p }}</span>
+        {% elif p <= 2 or p > pages - 2 or (p >= pageno - 2 and p <= pageno + 2) %}
+        <a class="ielts-page-link" href="/ielts/vocab?q={{ q }}&amp;page={{ p }}">{{ p }}</a>
+        {% elif p == 3 and pageno > 4 %}
+        <span class="ielts-page-gap">…</span>
+        {% elif p == pages - 2 and pageno < pages - 3 %}
+        <span class="ielts-page-gap">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if pageno < pages %}
+      <a class="ielts-page-link" href="/ielts/vocab?q={{ q }}&amp;page={{ pageno + 1 }}">Next ›</a>
+      {% endif %}
     {% endif %}
-    <span class="ielts-page-info">Page {{ pageno }} / {{ pages }}</span>
-    {% if pageno < pages %}
-    <a class="ielts-page-link" href="/ielts/vocab?q={{ q }}&amp;page={{ pageno + 1 }}">Next ›</a>
-    {% endif %}
+    <span class="ielts-page-info" id="vw-pageinfo">Page {{ pageno }} / {{ pages }}</span>
   </nav>
-  {% endif %}
 
 </main>
 

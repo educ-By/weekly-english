@@ -363,6 +363,46 @@
       popup.dataset.sentence = sent || "";
     }
 
+    // 雅思核心词表 —— 懒加载一次,用来给弹窗加"雅思核心词"徽章。
+    // 走 /api 而不是 /static 文件:CDN 对 /static/* 是 immutable 一年,词表更新
+    // 会被永久缓存住。也不能挂在 /api/dict 的响应上 —— 桌面端主路径是浏览器
+    // 内置翻译,压根不经过那个接口。
+    let ieltsWords = null;
+    let ieltsRequest = null;
+
+    function ieltsHas(word) {
+      return !!ieltsWords && ieltsWords.has(String(word || "").toLowerCase());
+    }
+
+    function ensureIeltsList() {
+      if (ieltsRequest) return ieltsRequest;
+      ieltsRequest = fetch("/api/ielts/wordlist")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && Array.isArray(d.words)) ieltsWords = new Set(d.words);
+          return ieltsWords;
+        })
+        .catch(() => null);
+      return ieltsRequest;
+    }
+
+    function ieltsBadge(word) {
+      return `<a class="vp-ielts" href="/ielts/vocab?q=${encodeURIComponent(word)}"` +
+             ` title="在雅思核心词表里查看">雅思核心词</a>`;
+    }
+
+    // 词表可能比弹窗晚到:到了之后把当前显示的那个词补上徽章
+    function patchIeltsBadge(word) {
+      ensureIeltsList().then(() => {
+        if (!ieltsHas(word) || popup.hidden || popup.dataset.word !== word) return;
+        const row = popup.querySelector(".vp-word");
+        if (!row || row.querySelector(".vp-ielts")) return;
+        const closeBtn = row.querySelector(".vp-close");
+        if (closeBtn) closeBtn.insertAdjacentHTML("beforebegin", ieltsBadge(word));
+        else row.insertAdjacentHTML("beforeend", ieltsBadge(word));
+      });
+    }
+
     // 弹窗正文统一走这里:写回 dataset(供"加入生词本"用)+ 渲染
     // extra 追加在按钮之后(引擎不可用时的"在线词典"退路);force 用于用户主动查询后覆盖旧内容
     function drawCard(el, info, extra, force) {
@@ -383,6 +423,7 @@
         (info.phonetic ? `<span class="vp-phon">${escapeHtml(info.phonetic)}</span>` : "") +
         (info.lemma ? `<span class="vp-lemma" title="原词形 → 原型">→ ${escapeHtml(info.lemma)}</span>` : "") +
         (info.cefr_level ? `<span class="vp-level">${escapeHtml(info.cefr_level)}</span>` : "") +
+        (ieltsHas(info.word) ? ieltsBadge(info.word) : "") +
         `<button class="vp-close" data-close-popup title="Close">✕</button>` +
         `</div>` +
         (def ? `<div class="vp-trans">${escapeHtml(def)}</div>` : "") +
@@ -390,6 +431,7 @@
         `<button class="vp-add" data-add-vocab>＋ Add to my words</button>` +
         (extra || "");
       showAt(el, html);
+      patchIeltsBadge(info.word);
     }
 
     // 引擎提示里的"再试一次查词"按钮:直接查服务端词典(离线 ECDICT + 免费机翻)

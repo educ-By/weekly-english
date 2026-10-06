@@ -523,9 +523,9 @@ def ielts_vocab_page(q: str = "", page: int = 1):
 
 
 @app.get("/ielts/flashcards", response_class=HTMLResponse)
-def ielts_flashcards_page():
+def ielts_flashcards_page(q: str = ""):
     html = _TPL_ENV.get_template("ielts_flashcards.html.j2").render(
-        page="ielts-flashcards", nav="ielts")
+        page="ielts-flashcards", nav="ielts", q=(q or "").strip())
     return HTMLResponse(html)
 
 
@@ -539,24 +539,46 @@ def ielts_practice_page():
 
 @app.get("/api/ielts/words")
 def api_ielts_words(q: str = "", page: int = 1):
-    """词表搜索 + 分页(无需登录)。"""
+    """词表搜索 + 分页(无需登录),词表页 AJAX 增强走这条。"""
     return ielts.query(q=q, page=page)
 
 
-@app.get("/api/ielts/drill")
-def api_ielts_drill(limit: int = 20, request: Request = None):
-    """闪卡抽词:登录用户优先抽未掌握的(box<3),其余按词表顺序补足;
-    未登录就按词表顺序给。返回 items 带 box/known。"""
-    limit = max(1, min(limit, 60))
-    all_words = ielts.ensure_words()
-    picked: list[dict] = []
-    user_id = None
+@app.get("/api/ielts/wordlist")
+def api_ielts_wordlist():
+    """纯词表(判断"是不是雅思核心词"用)。
+
+    文章页的查词弹窗要标"雅思核心词"徽章 —— 但桌面端主路径是浏览器内置翻译,
+    根本不经过 /api/dict,所以不能在词典响应里加字段;单独给一份纯词表,前端
+    懒加载一次即可。走路由而不用 /static 文件:CDN 对 /static/* 是 immutable
+    一年,词表更新会被永久缓存。
+    """
+    return {"words": ielts.wordlist_lines()}
+
+
+def _request_user_id(request: Request | None) -> int | None:
+    """从 Bearer token 解出 user id(可选登录接口用),失败就是未登录。"""
+    if request is None:
+        return None
     try:
-        authz = (request.headers.get("authorization") or "")
-        if authz.lower().startswith("bearer "):
-            user_id = int(auth.decode_token(authz[7:].strip()) or 0) or None
+        authz = request.headers.get("authorization") or ""
+        if not authz.lower().startswith("bearer "):
+            return None
+        return int(auth.decode_token(authz[7:].strip()) or 0) or None
     except Exception:
-        user_id = None
+        return None
+
+
+@app.get("/api/ielts/drill")
+def api_ielts_drill(limit: int = 20, q: str = "",
+                    include_mastered: bool = False, request: Request = None):
+    """闪卡抽词:从"未掌握池"里随机抽 limit 个(已掌握的词只在池子不够时才补)。
+
+    以前是按词表顺序取前 60 个 —— 未登录或零进度的用户每轮都拿同一批
+    abandon 起头的词,3255 个词里绝大多数永远出不来。
+    include_mastered=true 则把已掌握的词也放进池子(闪卡页那个勾选框)。
+    """
+    all_words = ielts.ensure_words()
+    user_id = _request_user_id(request)
     progress: dict[str, dict] = {}
     if user_id:
         try:
@@ -564,18 +586,19 @@ def api_ielts_drill(limit: int = 20, request: Request = None):
                 user_id, [w["word"] for w in all_words])
         except Exception as e:
             log.warning("ielts progress read failed: %s", e)
+    mastered = {w for w, p in progress.items() if (p.get("box") or 0) >= 3}
+    result = ielts.sample(q=q, limit=limit,
+                          mastered=set() if include_mastered else mastered)
+
     def _with_p(w):
         p = progress.get(w["word"]) or {}
         return {**w, "box": p.get("box", 0), "known": p.get("known", False)}
-    if user_id:
-        unmastered = [w for w in all_words
-                      if (progress.get(w["word"]) or {}).get("box", 0) < 3]
-        mastered = [w for w in all_words
-                    if (progress.get(w["word"]) or {}).get("box", 0) >= 3]
-        picked = [_with_p(w) for w in (unmastered + mastered)[:limit]]
-    else:
-        picked = [_with_p(w) for w in all_words[:limit]]
-    return {"items": picked, "total": len(all_words), "logged_in": bool(user_id)}
+
+    items = [_with_p(w) for w in result["items"]]
+    return {"items": items, "total": result["total"],
+            "pool": result["pool"], "mastered": len(mastered),
+            "total_words": len(all_words), "logged_in": bool(user_id),
+            "q": (q or "").strip().lower()}
 
 
 class IeltsProgressIn(BaseModel):
@@ -603,6 +626,10 @@ def api_ielts_progress_list(user: db.User = Depends(auth.require_user)):
             "mastered": sum(1 for i in items if i["box"] >= 3)}
 
 
+def _word_count(text: str) -> int:
+    return len(re.findall(r"[A-Za-z0-9'’-]+", text or ""))
+
+
 class IeltsWritingIn(BaseModel):
     question: str = ""
     essay: str
@@ -611,16 +638,31 @@ class IeltsWritingIn(BaseModel):
 @app.post("/api/ielts/writing")
 def api_ielts_writing(payload: IeltsWritingIn, request: Request,
                       user: db.User = Depends(auth.require_user)):
-    """Task 2 批改(需登录,走全局月度 AI 配额)。同步 def:阻塞调用进线程池。"""
+    """Task 2 批改(需登录,走全局月度 AI 配额)。同步 def:阻塞调用进线程池。
+
+    批改结果落库(IeltsWriting),刷新/换设备后仍能在 /me 回看。
+    """
     essay = (payload.essay or "").strip()
-    if len(essay) < 50:
-        raise HTTPException(400, "essay too short (min 50 chars)")
+    # 按词计而不是按字符:50 个字符连一句话都不到,当门槛没意义
+    if _word_count(essay) < 50:
+        raise HTTPException(400, "essay too short (min 50 words)")
     if _quota_exceeded("deepseek", request):
         return {"ok": False, "refused": False,
                 "content": "本月 AI 额度已用完,下月自动恢复。"}
     info = deepseek_client.ielts_writing_feedback(payload.question, essay)
-    _record_usage("deepseek", info.get("usage_tokens") or 0, request)
+    if info.get("ok") and not info.get("refused"):
+        try:
+            info["id"] = db.save_ielts_writing(
+                user.id, payload.question, essay,
+                info.get("scores"), info.get("content") or "")
+        except Exception as e:
+            log.warning("ielts writing save failed: %s", e)
     return info
+
+
+@app.get("/api/ielts/writing")
+def api_ielts_writing_list(user: db.User = Depends(auth.require_user)):
+    return {"items": db.list_ielts_writing(user.id)}
 
 
 class IeltsSpeakingIn(BaseModel):
@@ -632,10 +674,14 @@ class IeltsSpeakingIn(BaseModel):
 @app.post("/api/ielts/speaking")
 def api_ielts_speaking(payload: IeltsSpeakingIn, request: Request,
                        user: db.User = Depends(auth.require_user)):
-    """口语模拟一轮(需登录,走同一配额)。同步 def,理由同上。"""
+    """口语模拟一轮(需登录,走同一配额)。同步 def,理由同上。
+
+    action='feedback' 收尾时把整段对话与反馈落库(IeltsSpeaking)。
+    """
     action = (payload.action or "start").strip()
     if action not in ("start", "answer", "feedback"):
         raise HTTPException(400, "bad action")
+    part = payload.part if payload.part in (1, 2, 3) else 1
     history = payload.history[-24:]
     for h in history:
         if not isinstance(h, dict) or not isinstance(h.get("text", ""), str):
@@ -644,9 +690,23 @@ def api_ielts_speaking(payload: IeltsSpeakingIn, request: Request,
     if _quota_exceeded("deepseek", request):
         return {"ok": False, "refused": False,
                 "content": "本月 AI 额度已用完,下月自动恢复。"}
-    info = deepseek_client.ielts_speaking_turn(history, payload.part, action)
+    info = deepseek_client.ielts_speaking_turn(history, part, action)
     _record_usage("deepseek", info.get("usage_tokens") or 0, request)
+    if action == "feedback" and info.get("ok") and not info.get("refused"):
+        try:
+            # 存库的是纯反馈,不带 "===FEEDBACK===" 这个给前端分流用的标记
+            fb = (info.get("content") or "")
+            if "===FEEDBACK===" in fb:
+                fb = fb.split("===FEEDBACK===")[-1].strip()
+            info["id"] = db.save_ielts_speaking(user.id, part, history, fb)
+        except Exception as e:
+            log.warning("ielts speaking save failed: %s", e)
     return info
+
+
+@app.get("/api/ielts/speaking")
+def api_ielts_speaking_list(user: db.User = Depends(auth.require_user)):
+    return {"items": db.list_ielts_speaking(user.id)}
 
 
 # ---------- API ----------
@@ -1163,8 +1223,20 @@ def _background_refresh_once():
         rebuilt = 0
         log.warning("Legacy issue rebuild failed: %s", e)
 
-    # 3) catalog.json 缺失(旧卷)、刚迁移过、或刚补进历史期 —— 重建首页 / archive / 跨期索引
-    if rebuilt or _seeded_issue_count or not (OUT_DIR / "catalog.json").exists():
+    # 3) catalog.json 缺失(旧卷)、刚迁移过、刚补进历史期、或首页还缺雅思入口卡 ——
+    #    重建首页 / archive / 跨期索引(纯离线重渲染,不联网不烧 token)
+    home_lacks_ielts = False
+    try:
+        home_path = OUT_DIR / "index.html"
+        # 判定必须是入口卡独有的 id:导航里的 href="/ielts" 由 refresh_nav_links
+        # 先补上了,拿它当条件会永远为真
+        home_lacks_ielts = (home_path.exists()
+                            and 'id="home-ielts"' not in
+                            home_path.read_text(encoding="utf-8"))
+    except Exception:
+        home_lacks_ielts = False
+    if rebuilt or _seeded_issue_count or home_lacks_ielts \
+            or not (OUT_DIR / "catalog.json").exists():
         try:
             issues = core.scan_issues(OUT_DIR)
             if issues:

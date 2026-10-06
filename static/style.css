@@ -551,6 +551,21 @@ body.is-selecting { cursor: text; }
   color: var(--muted);
   margin-left: 6px;
 }
+/* 雅思核心词徽章 —— 可点,跳到专区词表里查这个词 */
+.vocab-popup .vp-ielts {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 2px;
+  margin-left: 6px;
+  background: #fdf3f3;
+  border: 1px solid #f0d0d0;
+  color: var(--c1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vocab-popup .vp-ielts:hover { background: var(--c1); color: #fff; }
 .vocab-popup .vp-add {
   display: inline-block;
   margin-top: 8px;

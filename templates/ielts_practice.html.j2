@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="{{ asset('style.css') }}" />
 <link rel="stylesheet" href="{{ asset('ielts.css') }}" />
 </head>
-<body data-page="ielts-practice">
+<body data-page="ielts-practice" data-ai-ready="{{ '1' if ai_ready else '0' }}">
 
 {% include "_masthead.html.j2" %}
 
@@ -24,8 +24,15 @@
   <section class="cover cover-compact ielts-cover">
     <div class="cover-kicker">AI Practice</div>
     <h1 class="cover-title">写作批改 · 口语模拟</h1>
-    <div class="cover-meta"><span>需登录 · 共享月度 AI 额度</span></div>
-    <p class="cover-blurb">{% if ai_ready %}AI 已就绪。{% else %}AI 未配置,练习功能暂不可用。{% endif %}</p>
+    <div class="cover-meta">
+      <span>需登录</span><span class="dot"></span>
+      <span>共享月度 AI 额度</span><span class="dot"></span>
+      <span id="pr-history-link-wrap" hidden><a href="/me#me-ielts">历史记录 →</a></span>
+    </div>
+    <p class="cover-blurb">
+      {% if ai_ready %}批改结果与口语记录会保存到你的账户,可在 <a href="/me#me-ielts">My learning</a> 回看。
+      {% else %}AI 未配置,练习功能暂不可用。{% endif %}
+    </p>
   </section>
 
   <nav class="level-switch" aria-label="IELTS pages">
@@ -43,30 +50,64 @@
     <label class="ielts-label" for="wr-question">题目(可选)</label>
     <textarea class="ielts-input" id="wr-question" rows="2"
       placeholder="例如: Some people think universities should only offer places to students with the highest grades. To what extent do you agree?"></textarea>
-    <label class="ielts-label" for="wr-essay">你的作文(至少 50 词)</label>
+
+    <label class="ielts-label" for="wr-essay">你的作文</label>
     <textarea class="ielts-input ielts-essay" id="wr-essay" rows="10"
       placeholder="Paste or write your Task 2 essay here…"></textarea>
+    <div class="ielts-meta-row">
+      <span id="wr-count" class="ielts-count">0 words</span>
+      <span class="ielts-count-hint" id="wr-hint">Task 2 建议 250 词以上 · 至少 50 词</span>
+    </div>
+
     <button class="ielts-btn ielts-submit" type="button" id="wr-submit">批改</button>
+    <div class="ielts-alert" id="wr-alert" hidden></div>
     <div class="ielts-output" id="wr-output" hidden></div>
   </section>
 
   <section class="ielts-pane" id="pane-speaking">
-    <div class="ielts-label">选择 Part:
-      <select class="ielts-input ielts-select" id="sp-part">
-        <option value="1">Part 1 · 日常问答</option>
-        <option value="2">Part 2 · 独白陈述</option>
-        <option value="3">Part 3 · 深入讨论</option>
-      </select>
+    <div class="ielts-meta-row">
+      <label class="ielts-label" for="sp-part">选择 Part:
+        <select class="ielts-input ielts-select" id="sp-part">
+          <option value="1">Part 1 · 日常问答</option>
+          <option value="2">Part 2 · 独白陈述</option>
+          <option value="3">Part 3 · 深入讨论</option>
+        </select>
+      </label>
+      <label class="ielts-say-toggle"><input type="checkbox" id="sp-sound" checked /> 朗读考官问题</label>
     </div>
+
+    <p class="ielts-hint">
+      考官问题会用语音朗读。作答方式是<strong>打字</strong>(或在本机录音自查发音)。
+      注意:文字作答只能评语法、词汇、句式与连贯 —— <strong>发音和流利度无法评估</strong>,反馈里不会给这两项的分数。
+    </p>
+
+    <div class="sp-timer" id="sp-timer" hidden>
+      <span class="sp-timer-label" id="sp-timer-label">准备</span>
+      <span class="sp-timer-clock" id="sp-timer-clock">1:00</span>
+      <button class="ielts-btn" type="button" id="sp-timer-skip">跳过准备</button>
+    </div>
+
     <div class="sp-log" id="sp-log">
       <p class="sp-empty">点击「开始」进入模拟考场。AI 扮演考官逐题提问,你用英文作答;想结束时点「结束并评分」。</p>
     </div>
+
     <textarea class="ielts-input" id="sp-input" rows="3" placeholder="Type your answer in English…"></textarea>
+
     <div class="sp-actions">
       <button class="ielts-btn ielts-submit" type="button" id="sp-start">开始</button>
       <button class="ielts-btn ielts-submit" type="button" id="sp-send" hidden>回答</button>
       <button class="ielts-btn" type="button" id="sp-end" hidden>结束并评分</button>
+      <button class="ielts-btn" type="button" id="sp-mic" hidden title="用语音输入(取决于浏览器支持)">🎤 语音输入</button>
+      <button class="ielts-btn" type="button" id="sp-rec" hidden title="在本机录音,自己回听发音">● 录音自查</button>
     </div>
+    <div class="sp-rec-box" id="sp-rec-box" hidden>
+      <span class="ielts-count" id="sp-rec-status">录音中…</span>
+      <audio id="sp-rec-audio" controls hidden></audio>
+      <button class="ielts-btn" type="button" id="sp-rec-del" hidden>重录</button>
+      <span class="ielts-count-hint">录音只存在本机浏览器,不会上传。</span>
+    </div>
+
+    <div class="ielts-alert" id="sp-alert" hidden></div>
   </section>
 
 </main>

@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="{{ asset('style.css') }}" />
 <link rel="stylesheet" href="{{ asset('ielts.css') }}" />
 </head>
-<body data-page="ielts-flashcards">
+<body data-page="ielts-flashcards" data-q="{{ q }}">
 
 {% include "_masthead.html.j2" %}
 
@@ -24,8 +24,19 @@
   <section class="cover cover-compact ielts-cover">
     <div class="cover-kicker">IELTS Flashcards</div>
     <h1 class="cover-title">闪卡自测</h1>
-    <div class="cover-meta"><span id="fc-status">Loading…</span></div>
-    <p class="cover-blurb">看单词想词义,点击卡片翻面。连续认识 3 次的词自动移出复习池(登录后云端保存)。</p>
+    <div class="cover-meta">
+      <span id="fc-status">Loading…</span>
+      <span class="dot" id="fc-mastered-wrap" hidden></span>
+      <span id="fc-mastered" hidden></span>
+    </div>
+    <p class="cover-blurb">
+      每轮随机抽 {{ 20 }} 个词,看词想义、点卡片翻面核对。连续认识 3 次即视为掌握,之后不再出现在默认复习池里。
+      键盘:空格翻面,1 = 不认识,2 = 认识。
+    </p>
+    {% if q %}
+    <p class="fc-scope">正在练:<strong>{{ q }}</strong> 相关单词
+      <a href="/ielts/flashcards">清除</a></p>
+    {% endif %}
   </section>
 
   <nav class="level-switch" aria-label="IELTS pages">
@@ -34,12 +45,17 @@
     <a class="chip ielts-chip" href="/ielts/practice">AI 练习</a>
   </nav>
 
+  <p class="ielts-hint" id="fc-login-hint" hidden>
+    未登录:本轮进度不会保存。<a href="/auth/login">登录</a>后进度记在云端,换设备也在。
+  </p>
+
   <section class="fc-stage" id="fc-stage">
-    <div class="fc-card" id="fc-card" tabindex="0" role="button" aria-label="Flip card">
+    <div class="fc-card" id="fc-card" tabindex="0" role="button"
+         aria-label="Flashcard — click or press space to flip">
       <div class="fc-face fc-front">
         <span class="fc-word" id="fc-word">…</span>
         <button class="ielts-btn fc-say" type="button" id="fc-say" title="发音">🔊</button>
-        <span class="fc-hint">点击翻面</span>
+        <span class="fc-hint">点击翻面 · 空格</span>
       </div>
       <div class="fc-face fc-back">
         <span class="fc-word fc-word-back" id="fc-word-back"></span>
@@ -48,12 +64,26 @@
         <p class="fc-trans" id="fc-trans"></p>
       </div>
     </div>
-    <div class="fc-controls">
-      <button class="ielts-btn fc-judge" type="button" id="fc-unknown">不认识</button>
-      <button class="ielts-btn fc-judge fc-good" type="button" id="fc-known">认识</button>
+
+    <div class="fc-controls" id="fc-controls">
+      <button class="ielts-btn fc-judge" type="button" id="fc-unknown">不认识 <kbd>1</kbd></button>
+      <button class="ielts-btn fc-judge fc-good" type="button" id="fc-known">认识 <kbd>2</kbd></button>
     </div>
+
+    <div class="fc-summary" id="fc-summary" hidden>
+      <h2 class="fc-summary-title" id="fc-summary-title">本轮完成</h2>
+      <p class="fc-summary-body" id="fc-summary-body"></p>
+      <div class="fc-summary-actions">
+        <button class="ielts-btn ielts-submit" type="button" id="fc-again">再来一轮</button>
+        <button class="ielts-btn" type="button" id="fc-review-missed" hidden>复习本轮不认识的</button>
+      </div>
+    </div>
+
     <div class="fc-foot">
-      <label class="fc-skip-label"><input type="checkbox" id="fc-include-mastered" /> 复习已掌握的词</label>
+      <label class="fc-skip-label">
+        <input type="checkbox" id="fc-include-mastered" /> 连已掌握的词一起复习
+      </label>
+      <label class="fc-skip-label"><input type="checkbox" id="fc-sound" checked /> 发音</label>
       <span class="fc-progress" id="fc-progress"></span>
     </div>
   </section>

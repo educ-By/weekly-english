@@ -12,6 +12,7 @@
   - VocabEntry    用户生词本
 """
 from __future__ import annotations
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -176,7 +177,11 @@ def ielts_progress_get(user_id: int, words: list[str]) -> dict[str, dict]:
 
 
 def ielts_progress_set(user_id: int, word: str, known: bool) -> dict:
-    """记录一次自评:认识则 box+1(封顶 3),不认识则清零。返回最新状态。"""
+    """记录一次自评:认识则 box+1(封顶 3),不认识则清零。
+
+    一并回传 mastered —— 闪卡页判定后要就地更新"已掌握 N 词",再单独查一次
+    等于每张卡多一个往返。
+    """
     with get_session_local()() as ses:
         row = ses.query(IeltsCardProgress).filter_by(
             user_id=user_id, word=word).first()
@@ -186,7 +191,91 @@ def ielts_progress_set(user_id: int, word: str, known: bool) -> dict:
         row.box = min(3, (row.box or 0) + 1) if known else 0
         row.known = bool(known)
         ses.commit()
-        return {"word": word, "box": row.box, "known": bool(row.known)}
+        mastered = (ses.query(IeltsCardProgress)
+                    .filter(IeltsCardProgress.user_id == user_id,
+                            IeltsCardProgress.box >= 3).count())
+        return {"word": word, "box": row.box, "known": bool(row.known),
+                "mastered": mastered}
+
+
+class IeltsWriting(Base):
+    """雅思写作批改记录 —— 刷新/换设备后仍能回看,也供 /me 展示历史。"""
+    __tablename__ = "ielts_writing"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    question = Column(Text, default="")
+    essay = Column(Text, default="")
+    scores = Column(Text, default="")        # JSON: {TR,CC,LR,GRA,OA}
+    feedback = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class IeltsSpeaking(Base):
+    """口语模拟的一次完整会话(含逐轮问答记录与最终反馈)。"""
+    __tablename__ = "ielts_speaking"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    part = Column(Integer, default=1)
+    transcript = Column(Text, default="")    # JSON: [{role, text}, ...]
+    feedback = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+def save_ielts_writing(user_id: int, question: str, essay: str,
+                       scores: dict | None, feedback: str) -> int:
+    with get_session_local()() as ses:
+        row = IeltsWriting(user_id=user_id, question=(question or "")[:4000],
+                           essay=essay or "",
+                           scores=json.dumps(scores or {}, ensure_ascii=False),
+                           feedback=feedback or "")
+        ses.add(row)
+        ses.commit()
+        return row.id
+
+
+def list_ielts_writing(user_id: int, limit: int = 20) -> list[dict]:
+    with get_session_local()() as ses:
+        rows = (ses.query(IeltsWriting)
+                .filter(IeltsWriting.user_id == user_id)
+                .order_by(IeltsWriting.created_at.desc()).limit(limit).all())
+        return [{"id": r.id, "question": r.question, "essay": r.essay,
+                 "scores": _loads(r.scores), "feedback": r.feedback,
+                 "created_at": r.created_at.isoformat(timespec="seconds")
+                 if r.created_at else ""}
+                for r in rows]
+
+
+def save_ielts_speaking(user_id: int, part: int,
+                        transcript: list[dict], feedback: str) -> int:
+    with get_session_local()() as ses:
+        row = IeltsSpeaking(user_id=user_id, part=int(part or 1),
+                            transcript=json.dumps(transcript or [],
+                                                  ensure_ascii=False),
+                            feedback=feedback or "")
+        ses.add(row)
+        ses.commit()
+        return row.id
+
+
+def list_ielts_speaking(user_id: int, limit: int = 20) -> list[dict]:
+    with get_session_local()() as ses:
+        rows = (ses.query(IeltsSpeaking)
+                .filter(IeltsSpeaking.user_id == user_id)
+                .order_by(IeltsSpeaking.created_at.desc()).limit(limit).all())
+        return [{"id": r.id, "part": r.part,
+                 "transcript": _loads(r.transcript, []),
+                 "feedback": r.feedback,
+                 "created_at": r.created_at.isoformat(timespec="seconds")
+                 if r.created_at else ""}
+                for r in rows]
+
+
+def _loads(raw, fallback=None):
+    """坏 JSON 不该让整个列表接口挂掉。"""
+    try:
+        return json.loads(raw) if raw else (fallback if fallback is not None else {})
+    except (ValueError, TypeError):
+        return fallback if fallback is not None else {}
 
 
 def summaries_existing(keys: list[str]) -> set[str]:

@@ -118,9 +118,114 @@
       renderStats(vocab, rows);
       renderVocab(vocab);
       renderReading(rows);
+      renderIelts();
     } catch (e) {
       localStorage.clear();
       location.href = "/auth/login";
+    }
+  }
+
+  /* ---------------- 雅思专区:闪卡进度 + 练习历史 ---------------- */
+  async function renderIelts() {
+    const flashSlot = document.getElementById("me-ielts-flash");
+    const wrSlot = document.getElementById("me-ielts-writing");
+    const spSlot = document.getElementById("me-ielts-speaking");
+    if (!flashSlot) return;
+
+    const [prog, writing, speaking] = await Promise.all([
+      fetch("/api/ielts/progress", { headers }).then(r => r.json()).catch(() => null),
+      fetch("/api/ielts/writing", { headers }).then(r => r.json()).catch(() => null),
+      fetch("/api/ielts/speaking", { headers }).then(r => r.json()).catch(() => null),
+    ]);
+
+    // 闪卡进度
+    if (prog && typeof prog.mastered === "number") {
+      const wrap = document.createElement("div");
+      wrap.className = "ielts-me-flash";
+      const num = document.createElement("span");
+      num.className = "ielts-me-num";
+      num.textContent = String(prog.mastered);
+      wrap.appendChild(num);
+      const label = document.createElement("span");
+      label.textContent = "个词已掌握(连续认识 3 次)" +
+        ((prog.items || []).length ? " · 共练过 " + prog.items.length + " 个词" : "");
+      wrap.appendChild(label);
+      const go = document.createElement("a");
+      go.className = "ielts-btn";
+      go.href = "/ielts/flashcards";
+      go.textContent = "继续练闪卡";
+      wrap.appendChild(go);
+      flashSlot.innerHTML = "";
+      flashSlot.appendChild(wrap);
+    } else {
+      flashSlot.innerHTML = '<p class="me-empty">还没有闪卡记录。' +
+        '<a href="/ielts/flashcards">去练一组</a></p>';
+    }
+
+    // 写作批改历史
+    const wItems = (writing && writing.items) || [];
+    if (!wItems.length) {
+      wrSlot.innerHTML = '<p class="me-empty">还没有写作批改记录。' +
+        '<a href="/ielts/practice">去批改一篇</a></p>';
+    } else {
+      wrSlot.innerHTML = "";
+      wItems.slice(0, 10).forEach((it) => {
+        const d = document.createElement("details");
+        d.className = "ielts-me-row";
+        const s = document.createElement("summary");
+        const band = it.scores && it.scores.OA != null ? "Band " + it.scores.OA + " · " : "";
+        s.textContent = band + (it.question || it.essay || "").slice(0, 60) +
+          (it.question && it.question.length > 60 ? "…" : "");
+        const when = document.createElement("span");
+        when.className = "ielts-me-when";
+        when.textContent = it.created_at;
+        s.appendChild(when);
+        d.appendChild(s);
+        if (it.scores && it.scores.TR != null) {
+          const line = document.createElement("p");
+          line.className = "ielts-me-body";
+          line.textContent = "TR " + it.scores.TR + " · CC " + it.scores.CC +
+            " · LR " + it.scores.LR + " · GRA " + it.scores.GRA;
+          d.appendChild(line);
+        }
+        const body = document.createElement("p");
+        body.className = "ielts-me-body";
+        body.textContent = it.feedback || "";
+        d.appendChild(body);
+        wrSlot.appendChild(d);
+      });
+    }
+
+    // 口语历史
+    const sItems = (speaking && speaking.items) || [];
+    if (!sItems.length) {
+      spSlot.innerHTML = '<p class="me-empty">还没有口语记录。' +
+        '<a href="/ielts/practice">去模拟一场</a></p>';
+    } else {
+      spSlot.innerHTML = "";
+      sItems.slice(0, 10).forEach((it) => {
+        const d = document.createElement("details");
+        d.className = "ielts-me-row";
+        const s = document.createElement("summary");
+        const turns = (it.transcript || []).filter((t) => t.role === "candidate").length;
+        s.textContent = "Part " + it.part + " · " + turns + " 轮作答";
+        const when = document.createElement("span");
+        when.className = "ielts-me-when";
+        when.textContent = it.created_at;
+        s.appendChild(when);
+        d.appendChild(s);
+        (it.transcript || []).forEach((t) => {
+          const line = document.createElement("p");
+          line.className = "ielts-me-body";
+          line.textContent = (t.role === "examiner" ? "考官: " : "你: ") + t.text;
+          d.appendChild(line);
+        });
+        const fb = document.createElement("p");
+        fb.className = "ielts-me-body";
+        fb.textContent = it.feedback || "";
+        d.appendChild(fb);
+        spSlot.appendChild(d);
+      });
     }
   }
 

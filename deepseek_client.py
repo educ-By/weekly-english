@@ -254,11 +254,24 @@ Refuse (reply: "This question is outside the scope of the IELTS tutor.") for:
 Style:
 - Feedback in simplified Chinese; quote the learner's English verbatim when pointing at it.
 - Band scores use the official 0–9 scale (may use .5 steps).
-- Plain text only. No emoji. No markdown tables."""
+- Plain text only. No emoji. No markdown tables.
+
+SPEAKING — hard limit on what you may assess:
+You only ever receive a written transcript. You cannot hear the candidate, so you
+must never score, estimate or guess Pronunciation or Fluency. Assess only what the
+text supports: grammatical accuracy, lexical range and appropriacy, sentence
+structure, coherence and idea development, task response. State plainly that
+pronunciation and fluency need a recording and are out of scope in this mode."""
 
 
-def _ielts_chat(messages: list[dict], max_tokens: int) -> dict:
-    """雅思共用的阻塞调用(调用方必须跑在线程池,同步 def 路由)。"""
+def _ielts_chat(messages: list[dict], max_tokens: int,
+                reasoning_fallback: bool = True) -> dict:
+    """雅思共用的阻塞调用(调用方必须跑在线程池,同步 def 路由)。
+
+    reasoning_fallback: content 为空时是否退回思考文本。批改/结构化输出必须传
+    False —— 思考流里写的是 "Let's refine scoring..." 这类过程独白,当答案返回
+    等于给用户看推理残渣。
+    """
     cfg = _cfg("ASK", "DEEPSEEK", "LLM")
     if not cfg["api_key"]:
         return {"ok": False, "refused": False,
@@ -266,21 +279,17 @@ def _ielts_chat(messages: list[dict], max_tokens: int) -> dict:
                 "model": DEFAULT_MODEL}
     messages = [{"role": "system", "content": IELTS_SYSTEM_PROMPT}] + messages
     try:
-        client = _client(cfg, timeout=90.0)   # 整篇作文批改生成慢,给足时间
+        client = _client(cfg, timeout=120.0)   # 整篇作文批改要思考 + 长输出,给足时间
         resp = client.chat.completions.create(
             model=cfg["model"], messages=messages,
             max_tokens=max_tokens, temperature=0.3)
         msg = resp.choices[0].message
         content = (msg.content or "").strip()
-        if not content:
+        if not content and reasoning_fallback:
             rc = getattr(msg, "reasoning_content", None) or ""
             paras = [p.strip() for p in rc.split("\n") if p.strip()]
             content = paras[-1][:1200] if paras else ""
         usage = getattr(resp, "usage", None)
-        if not content:
-            return {"ok": False, "refused": False,
-                    "content": "AI 没能生成反馈，请稍后再试一次。",
-                    "model": cfg["model"]}
         return {"ok": True,
                 "refused": "outside the scope" in content.lower(),
                 "content": content, "model": cfg["model"],
@@ -293,20 +302,84 @@ def _ielts_chat(messages: list[dict], max_tokens: int) -> dict:
 
 
 def ielts_writing_feedback(question: str, essay: str) -> dict:
-    """Task 2 批改:按 TR/CC/LR/GRA 四项打分 + 总分 + 中文改进建议。"""
-    prompt = (
-        "请按雅思官方评分标准批改下面这篇 Writing Task 2 作文。\n"
-        "输出格式(纯文本,中文):\n"
-        "各评分项分数: TR=x.x, CC=x.x, LR=x.x, GRA=x.x\n"
-        "总分: x.x\n"
-        "然后分三节:\n"
+    """Task 2 批改:按 TR/CC/LR/GRA 四项打分 + 总分 + 中文改进建议。
+
+    分数单独一行输出,由 _split_scores 解析出来供前端渲染成分数卡。必须重试且给
+    足预算的原因:DeepSeek 是思考型模型,思考本身也吃 max_tokens —— 这道题它常
+    常先想掉 1500~4000 tokens,预算不够时 content 会被截成一句残片(实测
+    max_tokens=1600 时批改返回的就是引文碎片,分数行自然也没有)。思考流不是答案,
+    所以这里关掉 reasoning 兜底,拿不到规范输出就加大预算重来。
+    """
+    head = (
+        "**第一行必须严格是下面这种格式,不要加别的内容**:\n"
+        "SCORES: TR=6.5|CC=6.0|LR=6.5|GRA=6.0|OA=6.0\n"
+        "(按官方量表实事求是地打分,0-9 可用 .5;OA 是四项平均后取整到 .5。\n"
+        " 不要照抄上面这行示例分数,那是格式示例)\n"
+        "空一行后,再分三节输出(纯文本,中文):\n"
         "【主要问题】3 条以内,每条引用作文原句指出问题\n"
         "【改进建议】逐段给具体改法,给出 2-3 个可替换的高级表达\n"
         "【提升到 7 分还差什么】一段话\n\n"
-        f"题目:\n{(question or 'Some people believe that... (题目未提供,按一般议论文评)').strip()}\n\n"
-        f"作文:\n{essay.strip()[:6000]}"
     )
-    return _ielts_chat([{"role": "user", "content": prompt}], max_tokens=1600)
+    tail = (f"题目:\n{(question or 'Some people believe that... (题目未提供,按一般议论文评)').strip()}\n\n"
+            f"作文:\n{essay.strip()[:6000]}")
+    cfg = _cfg("ASK", "DEEPSEEK", "LLM")
+    info: dict = {}
+    best = ""
+    spent = 0
+    for attempt, budget in enumerate((6000, 8000, 8000)):
+        note = "" if attempt == 0 else (
+            "\n注意:上一次没有按格式输出(第一行必须就是 SCORES 那一行,"
+            "后面才是三节建议)。请直接输出结果,不要复述这些要求。")
+        info = _ielts_chat(
+            [{"role": "user", "content":
+              "请按雅思官方评分标准批改下面这篇 Writing Task 2 作文。\n"
+              + head + note + tail}],
+            max_tokens=budget, reasoning_fallback=False)
+        if not info.get("ok") or info.get("refused"):
+            return info
+        spent += info.get("usage_tokens") or 0
+        raw = info.get("content") or ""
+        scores, body = _split_scores(raw)
+        if scores and len(body) >= 80:
+            info["scores"] = scores
+            info["content"] = body
+            info["usage_tokens"] = spent
+            return info
+        if len(raw) > len(best):
+            best = raw
+        log.info("ielts writing: no parseable SCORES (attempt %d, %d chars, budget %d)",
+                 attempt + 1, len(raw), budget)
+    # 分数行始终没出来:有正文就退回纯文本展示(前端会按纯文本渲染),
+    # 正文也空(思考把预算吃光)才如实报失败 —— 别把思考残渣当反馈给出去
+    if best.strip():
+        info["content"] = best
+        info["usage_tokens"] = spent
+        return info
+    return {"ok": False, "refused": False,
+            "content": "AI 这次没能生成批改(思考超出长度限制),请再试一次。",
+            "model": cfg.get("model") or DEFAULT_MODEL, "usage_tokens": spent}
+
+
+# 模型被要求把分数写在第一行;容忍空格、逗号分隔与缺项顺序
+_SCORES_RE = re.compile(
+    r"^[^\n]*?SCORES:\s*"
+    r"TR\s*=\s*(\d(?:\.\d)?)\s*(?:[|,]\s*)"
+    r"CC\s*=\s*(\d(?:\.\d)?)\s*(?:[|,]\s*)"
+    r"LR\s*=\s*(\d(?:\.\d)?)\s*(?:[|,]\s*)"
+    r"GRA\s*=\s*(\d(?:\.\d)?)\s*(?:[|,]\s*)"
+    r"OA\s*=\s*(\d(?:\.\d)?)",
+    re.M | re.I)
+
+
+def _split_scores(content: str) -> tuple[dict | None, str]:
+    """从批改文本里抽出 SCORES 行;抽到就把它从正文里删掉(不重复展示)。"""
+    m = _SCORES_RE.search(content or "")
+    if not m:
+        return None, content
+    keys = ["TR", "CC", "LR", "GRA", "OA"]
+    scores = {k: float(m.group(i + 1)) for i, k in enumerate(keys)}
+    body = (content[:m.start()] + content[m.end():]).strip()
+    return scores, body
 
 
 _SPEAKING_PART_GUIDE = {
@@ -326,12 +399,23 @@ def ielts_speaking_turn(history: list[dict], part: int, action: str) -> dict:
     instruction = (
         f"Simulate the IELTS Speaking test. {_SPEAKING_PART_GUIDE[part]}\n"
         "Respond ONLY as the examiner: ask the next question (do not answer it yourself).\n"
-        "If the candidate just gave an answer and you are ending the session, instead output "
-        "'===FEEDBACK===' then estimate a band for fluency/vocabulary/grammar/pronunciation "
-        "(based on their written answers), list 3 weaknesses with their original sentences, "
-        "and 3 better expressions they could have used. All feedback in Chinese.\n"
-        "Now output your next examiner turn (or the feedback if the session should end).\n\n"
+        "If the current request asks you to wrap up, instead output '===FEEDBACK===' then give "
+        "feedback that respects the SPEAKING hard limit from your instructions:\n"
+        "- Assess ONLY grammar accuracy, vocabulary range/appropriacy, sentence structure, "
+        "coherence and idea development, and task response.\n"
+        "- Do NOT give any band or comment for pronunciation or fluency — the candidate's "
+        "audio was never available. Open the feedback by saying so in one sentence.\n"
+        "- Give a band for '语言维度(语法/词汇/句式/连贯)' only, clearly labelled as such.\n"
+        "- List 3 weaknesses quoting their original sentences, and 3 better expressions "
+        "they could have used. All feedback in Chinese.\n"
+        "Now output your next examiner turn (or the feedback if wrapping up).\n\n"
         f"Transcript so far:\n{transcript}\n\nCurrent request: {action.strip()}"
     )
-    return _ielts_chat([{"role": "user", "content": instruction}], max_tokens=900)
+    info = _ielts_chat([{"role": "user", "content": instruction}],
+                       max_tokens=2500, reasoning_fallback=False)
+    if info.get("ok") and not (info.get("content") or "").strip():
+        # 思考吃光预算时 content 会空 —— 思考流是过程独白,不能当考官的话发给学生
+        info["ok"] = False
+        info["content"] = "AI 这次没能生成内容,请再点一次。"
+    return info
 

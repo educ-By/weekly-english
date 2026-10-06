@@ -29,7 +29,11 @@
 .ielts-tips strong { color: #a63a3a; }
 
 /* ---------- 词表页 ---------- */
-.ielts-search { display: flex; gap: .5rem; margin: 1.2rem 0; max-width: 30rem; }
+.ielts-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .8rem;
+  margin: 1.2rem 0;
+}
+.ielts-search { display: flex; gap: .5rem; flex: 1 1 18rem; max-width: 30rem; }
 .ielts-search input {
   flex: 1; padding: .5rem .8rem; border: 1px solid #ccc; border-radius: 6px;
   font-size: .95rem;
@@ -38,6 +42,11 @@
   padding: .5rem 1rem; border: 1px solid #a63a3a; background: #a63a3a;
   color: #fff; border-radius: 6px; cursor: pointer;
 }
+.ielts-say-toggle, .fc-skip-label {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .88rem; color: #666; cursor: pointer;
+}
+.ielts-drill-link { text-decoration: none; white-space: nowrap; }
 .ielts-wordlist { list-style: none; margin: 0; padding: 0; }
 .ielts-word {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .8rem;
@@ -46,6 +55,11 @@
 .ielts-word-text { font-weight: 600; font-size: 1.05rem; }
 .ielts-phon { color: #888; font-size: .88rem; }
 .ielts-pos { color: #a63a3a; font-size: .85rem; font-style: italic; }
+.ielts-box {
+  font-size: .78rem; color: #777; border: 1px solid #ddd;
+  border-radius: 999px; padding: 0 .5rem;
+}
+.ielts-box.is-mastered { color: #2e7d32; border-color: #9ccc9f; background: #f1f8f2; }
 .ielts-trans { flex-basis: 100%; margin: 0; color: #444; font-size: .9rem; }
 .ielts-word-actions { margin-left: auto; display: flex; gap: .4rem; }
 .ielts-btn {
@@ -53,10 +67,25 @@
   border: 1px solid #bbb; background: #fff; border-radius: 5px;
 }
 .ielts-btn:hover { border-color: #a63a3a; color: #a63a3a; }
-.ielts-pager {
-  display: flex; align-items: center; gap: 1rem; justify-content: center;
-  margin: 1.5rem 0;
+.ielts-btn:disabled { opacity: .55; cursor: wait; }
+.ielts-hint {
+  margin: .8rem 0; padding: .6rem .9rem; font-size: .88rem; line-height: 1.6;
+  background: #fdf6f6; border: 1px solid #f0dada; border-radius: 6px;
+  color: #7a3b3b;
 }
+.ielts-alert {
+  margin-top: .8rem; padding: .6rem .9rem; border-radius: 6px;
+  font-size: .9rem; line-height: 1.6; border: 1px solid #e8e0d4;
+  background: #faf7f2; color: #444;
+}
+.ielts-alert.is-err { background: #fdf3f3; border-color: #f0c9c9; color: #a63a3a; }
+.ielts-alert.is-warn { background: #fdf8ec; border-color: #eddfb8; color: #8a6d1f; }
+.ielts-alert.is-ok { background: #f2f8f3; border-color: #cbe3cd; color: #2e7d32; }
+.ielts-pager {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem;
+  justify-content: center; margin: 1.5rem 0;
+}
+.ielts-page-gap { color: #bbb; }
 .ielts-page-link { color: #a63a3a; text-decoration: none; }
 .ielts-page-info { color: #777; font-size: .9rem; }
 .empty { color: #777; padding: 1.5rem 0; }
@@ -95,6 +124,20 @@
   margin-top: 1rem; color: #777; font-size: .88rem;
 }
 .fc-skip-label { display: flex; align-items: center; gap: .35rem; cursor: pointer; }
+.fc-scope { margin: .4rem 0 0; font-size: .9rem; color: #666; }
+.fc-summary {
+  padding: 1.4rem 1.2rem; text-align: center; background: #faf7f2;
+  border: 1px solid #e8e0d4; border-radius: 12px;
+}
+.fc-summary-title { margin: 0 0 .5rem; font-size: 1.2rem; color: #a63a3a; }
+.fc-summary-body { margin: 0 0 1rem; color: #444; font-size: .93rem; line-height: 1.7; }
+.fc-summary-actions { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
+.fc-summary-actions .ielts-submit { margin-top: 0; }
+
+/* 隐藏:作者样式里的 display:flex 会盖过 UA 的 [hidden] { display:none },
+   这些容器的隐藏都靠 hidden 属性,得显式补回来 */
+.fc-controls[hidden], .sp-timer[hidden], .sp-rec-box[hidden],
+.ielts-pager[hidden], .ielts-alert[hidden] { display: none; }
 
 /* ---------- AI 练习 ---------- */
 .ielts-tabs { display: flex; gap: .5rem; margin-top: 1.5rem; }
@@ -136,10 +179,70 @@
 .sp-candidate { color: #333; }
 .sp-feedback { white-space: pre-wrap; color: #333; border-top: 1px dashed #ccc; padding-top: .6rem; }
 .sp-empty { color: #999; font-size: .9rem; }
-.sp-actions { display: flex; gap: .6rem; }
+.sp-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
 .sp-actions .ielts-submit { margin-top: 0; }
+.sp-timer {
+  display: flex; align-items: center; gap: .8rem; margin: .8rem 0;
+  padding: .6rem .9rem; background: #fdf6f6; border: 1px solid #f0dada;
+  border-radius: 6px;
+}
+.sp-timer-label { color: #7a3b3b; font-size: .9rem; }
+.sp-timer-clock { font-size: 1.4rem; font-weight: 700; color: #a63a3a; font-variant-numeric: tabular-nums; }
+.sp-rec-box {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .8rem;
+  margin-top: .8rem; padding: .6rem .9rem; background: #faf7f2;
+  border: 1px solid #e8e0d4; border-radius: 6px;
+}
+.sp-rec-box audio { flex: 1 1 16rem; height: 2.2rem; }
+
+/* ---------- 写作分数卡 ---------- */
+.ielts-meta-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+  justify-content: space-between; margin-top: .4rem;
+}
+.ielts-count { font-size: .88rem; color: #888; font-variant-numeric: tabular-nums; }
+.ielts-count.is-ok { color: #2e7d32; }
+.ielts-count-hint { font-size: .82rem; color: #999; }
+.wr-scores {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1.2rem;
+  padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e8e0d4;
+}
+.wr-overall { text-align: center; }
+.wr-overall-num { display: block; font-size: 2.6rem; font-weight: 700; color: #a63a3a; line-height: 1; }
+.wr-overall-label { font-size: .8rem; color: #888; }
+.wr-score-grid { display: flex; flex-wrap: wrap; gap: .6rem; }
+.wr-score {
+  min-width: 4.2rem; padding: .5rem .7rem; text-align: center;
+  background: #faf7f2; border: 1px solid #e8e0d4; border-radius: 6px;
+}
+.wr-score-num { display: block; font-size: 1.2rem; font-weight: 700; }
+.wr-score-label { font-size: .78rem; color: #888; }
+.wr-block { margin-bottom: .9rem; }
+.wr-block-title { margin: 0 0 .3rem; font-size: .95rem; color: #a63a3a; }
+.wr-block-body { margin: 0; white-space: pre-wrap; line-height: 1.7; font-size: .93rem; }
+
+/* ---------- 个人页雅思区块 ---------- */
+.ielts-me-flash { display: flex; flex-wrap: wrap; gap: .6rem; align-items: baseline; }
+.ielts-me-num { font-size: 1.6rem; font-weight: 700; color: #a63a3a; }
+.ielts-me-row {
+  padding: .7rem .2rem; border-bottom: 1px solid #eee; font-size: .9rem;
+}
+.ielts-me-row summary { cursor: pointer; }
+.ielts-me-when { color: #999; font-size: .82rem; margin-left: .5rem; }
+.ielts-me-body { margin: .6rem 0 .2rem; white-space: pre-wrap; line-height: 1.7; }
+
+kbd {
+  font: inherit; font-size: .78em; padding: 0 .3em; margin-left: .3em;
+  border: 1px solid #ddd; border-bottom-width: 2px; border-radius: 4px;
+  color: #888;
+}
 
 @media (max-width: 640px) {
-  .fc-card { height: 13rem; }
+  .fc-card { height: 15rem; }
+  .fc-card .fc-face { padding: .9rem; }
+  .fc-trans { max-height: 7rem; overflow-y: auto; }
   .ielts-word-actions { margin-left: 0; flex-basis: 100%; }
+  .ielts-pane { padding: .9rem; }
+  .ielts-tabs { flex-wrap: wrap; }
+  .sp-actions .ielts-btn { flex: 1 1 auto; }
 }

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Weekly English · Hand-picked reading, graded B1–C1</title>
 <link rel="stylesheet" href="{{ asset('style.css') }}" />
+<link rel="stylesheet" href="{{ asset('ielts.css') }}" />
 </head>
 <body data-page="home">
 
@@ -74,6 +75,30 @@
     </div>
   </section>
   {% endif %}
+
+  <section class="home-block" id="home-ielts">
+    <div class="home-block-head">
+      <h2 class="home-h2">IELTS zone</h2>
+      <a class="home-more" href="/ielts">Open the zone →</a>
+    </div>
+    <div class="cards">
+      <a class="card ielts-card" href="/ielts/vocab">
+        <div class="card-head"><span class="src">Vocabulary</span><span class="chip ielts-chip">词表</span></div>
+        <h3 class="card-title">雅思核心词汇</h3>
+        <p class="card-deck">学术词表 + B2/C1 高阶词合并,带音标、词性与中文释义,可一键收进生词本。</p>
+      </a>
+      <a class="card ielts-card" href="/ielts/flashcards">
+        <div class="card-head"><span class="src">Flashcards</span><span class="chip ielts-chip">闪卡</span></div>
+        <h3 class="card-title">闪卡自测</h3>
+        <p class="card-deck">每轮随机抽词,自评认识与否;连续认识三次即视为掌握,进度云端保存。</p>
+      </a>
+      <a class="card ielts-card" href="/ielts/practice">
+        <div class="card-head"><span class="src">AI Practice</span><span class="chip ielts-chip">AI 练习</span></div>
+        <h3 class="card-title">写作批改 · 口语模拟</h3>
+        <p class="card-deck">Task 2 作文按官方四项标准评分给建议;口语模拟考官逐题问答并朗读问题。</p>
+      </a>
+    </div>
+  </section>
 
   {% if recent %}
   <section class="home-block">
