@@ -42,11 +42,20 @@
   </nav>
 
   <div class="ielts-tabs" role="tablist">
-    <button class="ielts-tab is-on" type="button" role="tab" data-tab="writing">Writing Task 2</button>
+    <button class="ielts-tab is-on" type="button" role="tab" data-tab="writing">Writing</button>
     <button class="ielts-tab" type="button" role="tab" data-tab="speaking">Speaking</button>
   </div>
 
   <section class="ielts-pane is-on" id="pane-writing">
+    <div class="ielts-meta-row">
+      <label class="ielts-label" for="wr-task">选择题型:
+        <select class="ielts-input ielts-select" id="wr-task">
+          <option value="2">Task 2 · 议论文(250 词)</option>
+          <option value="1">Task 1 · 图表描述(150 词)</option>
+        </select>
+      </label>
+    </div>
+
     <label class="ielts-label" for="wr-question">题目(可选)</label>
     <textarea class="ielts-input" id="wr-question" rows="2"
       placeholder="例如: Some people think universities should only offer places to students with the highest grades. To what extent do you agree?"></textarea>
@@ -58,6 +67,9 @@
       <span id="wr-count" class="ielts-count">0 words</span>
       <span class="ielts-count-hint" id="wr-hint">Task 2 建议 250 词以上 · 至少 50 词</span>
     </div>
+    <p class="ielts-count-hint" id="wr-chart-hint" hidden>
+      图表本身不会发给 AI。请把题目原文和图中关键数据写进上面的题目框,批改才能核对你有没有写错数字。
+    </p>
 
     <button class="ielts-btn ielts-submit" type="button" id="wr-submit">批改</button>
     <div class="ielts-alert" id="wr-alert" hidden></div>

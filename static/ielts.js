@@ -524,24 +524,48 @@
     const wrHint = document.getElementById("wr-hint");
     const wrBtn = document.getElementById("wr-submit");
     const wrOut = document.getElementById("wr-output");
+    const wrTask = document.getElementById("wr-task");
+    const wrQuestion = document.getElementById("wr-question");
+    const wrChartHint = document.getElementById("wr-chart-hint");
+
+    // 两种题型只差目标字数、TR 的名字和提示文案
+    const WR_TASK = {
+      1: { target: 150, tr: "Task Achievement",
+           question: "粘贴图表题目原文,并写出图中关键数据,例如: The chart shows… 2010 → 25%, 2020 → 40%",
+           essay: "Paste or write your Task 1 report here…" },
+      2: { target: 250, tr: "Task Response",
+           question: "例如: Some people think universities should only offer places to students with the highest grades. To what extent do you agree?",
+           essay: "Paste or write your Task 2 essay here…" },
+    };
+
+    function currentTask() {
+      return Number(wrTask.value) === 1 ? 1 : 2;
+    }
 
     function updateCount() {
+      const task = currentTask();
       const n = countWords(wrEssay.value);
       wrCount.textContent = n + " words";
       wrCount.className = "ielts-count" + (n >= 50 ? " is-ok" : "");
-      wrHint.textContent = n >= 250
-        ? "已达 Task 2 建议长度 (250+)"
-        : "Task 2 建议 250 词以上 · 至少 50 词";
+      wrHint.textContent = n >= WR_TASK[task].target
+        ? "已达 Task " + task + " 建议长度 (" + WR_TASK[task].target + "+)"
+        : "Task " + task + " 建议 " + WR_TASK[task].target + " 词以上 · 至少 50 词";
     }
     wrEssay.addEventListener("input", updateCount);
-    updateCount();
+    wrTask.addEventListener("change", () => {
+      const cfg = WR_TASK[currentTask()];
+      wrQuestion.placeholder = cfg.question;
+      wrEssay.placeholder = cfg.essay;
+      wrChartHint.hidden = currentTask() !== 1;
+      updateCount();
+    });
+    wrTask.dispatchEvent(new Event("change"));
 
-    const SCORE_LABELS = {
-      TR: "Task Response", CC: "Coherence", LR: "Lexical",
-      GRA: "Grammar", OA: "总分",
-    };
-
-    function renderScores(scores) {
+    function renderScores(scores, task) {
+      const SCORE_LABELS = {
+        TR: WR_TASK[task].tr, CC: "Coherence", LR: "Lexical",
+        GRA: "Grammar", OA: "总分",
+      };
       const wrap = el("div", "wr-scores");
       const overall = el("div", "wr-overall");
       overall.appendChild(el("span", "wr-overall-num", String(scores.OA != null ? scores.OA : "–")));
@@ -587,6 +611,7 @@
         alertBox("wr-alert", "作文太短:至少 50 词(现在 " + countWords(essay) + " 词)。", "err");
         return;
       }
+      const task = currentTask();
       alertBox("wr-alert", "");
       wrBtn.disabled = true;
       wrOut.hidden = false;
@@ -594,7 +619,8 @@
       let out = null;
       try {
         out = await postJSON("/api/ielts/writing", {
-          question: document.getElementById("wr-question").value,
+          task: task,
+          question: wrQuestion.value,
           essay: essay,
         });
       } finally {
@@ -607,7 +633,7 @@
         return;
       }
       wrOut.innerHTML = "";
-      if (out.scores) wrOut.appendChild(renderScores(out.scores));
+      if (out.scores) wrOut.appendChild(renderScores(out.scores, task));
       wrOut.appendChild(renderFeedback(out.content));
       if (out.id) {
         alertBox("wr-alert", "已保存到 My learning,可随时回看这次批改。", "ok");

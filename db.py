@@ -207,6 +207,7 @@ class IeltsWriting(Base):
     essay = Column(Text, default="")
     scores = Column(Text, default="")        # JSON: {TR,CC,LR,GRA,OA}
     feedback = Column(Text, default="")
+    task = Column(Integer, default=2)        # 1 | 2,老记录经 _ADDED_COLUMNS 补成 2
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
@@ -222,12 +223,12 @@ class IeltsSpeaking(Base):
 
 
 def save_ielts_writing(user_id: int, question: str, essay: str,
-                       scores: dict | None, feedback: str) -> int:
+                       scores: dict | None, feedback: str, task: int = 2) -> int:
     with get_session_local()() as ses:
         row = IeltsWriting(user_id=user_id, question=(question or "")[:4000],
                            essay=essay or "",
                            scores=json.dumps(scores or {}, ensure_ascii=False),
-                           feedback=feedback or "")
+                           feedback=feedback or "", task=task)
         ses.add(row)
         ses.commit()
         return row.id
@@ -240,6 +241,7 @@ def list_ielts_writing(user_id: int, limit: int = 20) -> list[dict]:
                 .order_by(IeltsWriting.created_at.desc()).limit(limit).all())
         return [{"id": r.id, "question": r.question, "essay": r.essay,
                  "scores": _loads(r.scores), "feedback": r.feedback,
+                 "task": r.task or 2,
                  "created_at": r.created_at.isoformat(timespec="seconds")
                  if r.created_at else ""}
                 for r in rows]
@@ -416,8 +418,12 @@ def get_session_local():
 
 # create_all 只建"缺的表",绝不会给已有的表补列。所以往老库里加字段必须自己 ALTER,
 # 而且得幂等 —— 本地 SQLite 和线上 Neon Postgres 都要照顾到。
-_ADDED_COLUMNS: dict[str, str] = {
-    "display_name": "ALTER TABLE users ADD COLUMN display_name VARCHAR(24) NOT NULL DEFAULT ''",
+# key = (表名, 列名);表不存在时跳过(create_all 会直接建成新结构)。
+_ADDED_COLUMNS: dict[tuple[str, str], str] = {
+    ("users", "display_name"):
+        "ALTER TABLE users ADD COLUMN display_name VARCHAR(24) NOT NULL DEFAULT ''",
+    ("ielts_writing", "task"):
+        "ALTER TABLE ielts_writing ADD COLUMN task INTEGER NOT NULL DEFAULT 2",
 }
 
 
@@ -425,19 +431,19 @@ def _ensure_columns() -> None:
     engine = get_engine()
     try:
         insp = inspect(engine)
-        if "users" not in insp.get_table_names():
-            return
-        existing = {c["name"] for c in insp.get_columns("users")}
-        missing = {k: v for k, v in _ADDED_COLUMNS.items() if k not in existing}
-        if not missing:
-            return
-        with engine.begin() as conn:
-            for name, ddl in missing.items():
+        tables = set(insp.get_table_names())
+        for (table, name), ddl in _ADDED_COLUMNS.items():
+            if table not in tables:
+                continue
+            existing = {c["name"] for c in insp.get_columns(table)}
+            if name in existing:
+                continue
+            with engine.begin() as conn:
                 conn.execute(text(ddl))
-                log.info("Schema: added column users.%s", name)
+                log.info("Schema: added column %s.%s", table, name)
     except Exception as e:
         # 加列失败不该让服务起不来 —— 读取时对缺失字段一律走 .get() 兜底
-        log.warning("Schema check for users failed: %s", e)
+        log.warning("Schema check failed: %s", e)
 
 
 def init_db():

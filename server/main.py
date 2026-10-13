@@ -641,12 +641,13 @@ def _word_count(text: str) -> int:
 class IeltsWritingIn(BaseModel):
     question: str = ""
     essay: str
+    task: int = 2                  # 1 图表描述 | 2 议论文
 
 
 @app.post("/api/ielts/writing")
 def api_ielts_writing(payload: IeltsWritingIn, request: Request,
                       user: db.User = Depends(auth.require_user)):
-    """Task 2 批改(需登录,走全局月度 AI 配额)。同步 def:阻塞调用进线程池。
+    """Task 1/2 批改(需登录,走全局月度 AI 配额)。同步 def:阻塞调用进线程池。
 
     批改结果落库(IeltsWriting),刷新/换设备后仍能在 /me 回看。
     """
@@ -654,15 +655,16 @@ def api_ielts_writing(payload: IeltsWritingIn, request: Request,
     # 按词计而不是按字符:50 个字符连一句话都不到,当门槛没意义
     if _word_count(essay) < 50:
         raise HTTPException(400, "essay too short (min 50 words)")
+    task = payload.task if payload.task in (1, 2) else 2
     if _quota_exceeded("deepseek", request):
         return {"ok": False, "refused": False,
                 "content": "本月 AI 额度已用完,下月自动恢复。"}
-    info = deepseek_client.ielts_writing_feedback(payload.question, essay)
+    info = deepseek_client.ielts_writing_feedback(payload.question, essay, task)
     if info.get("ok") and not info.get("refused"):
         try:
             info["id"] = db.save_ielts_writing(
                 user.id, payload.question, essay,
-                info.get("scores"), info.get("content") or "")
+                info.get("scores"), info.get("content") or "", task)
         except Exception as e:
             log.warning("ielts writing save failed: %s", e)
     return info

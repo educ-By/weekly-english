@@ -174,7 +174,8 @@
         d.className = "ielts-me-row";
         const s = document.createElement("summary");
         const band = it.scores && it.scores.OA != null ? "Band " + it.scores.OA + " · " : "";
-        s.textContent = band + (it.question || it.essay || "").slice(0, 60) +
+        const kind = "Task " + (it.task === 1 ? 1 : 2) + " · ";
+        s.textContent = band + kind + (it.question || it.essay || "").slice(0, 60) +
           (it.question && it.question.length > 60 ? "…" : "");
         const when = document.createElement("span");
         when.className = "ielts-me-when";

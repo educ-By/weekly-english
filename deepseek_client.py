@@ -330,27 +330,40 @@ _ECONOMY_RULES = (
 )
 
 
-def _writing_prompt(question: str, essay: str, note: str = "") -> str:
-    """Task 2 批改的完整 prompt(生产与 tools/measure_ielts_tokens.py 共用一处)。"""
+_WRITING_FALLBACK_TOPIC = {
+    1: "(题目未提供,按一般图表描述评;图表数据未给出时只评作文本身,不要假设图表内容)",
+    2: "Some people believe that... (题目未提供,按一般议论文评)",
+}
+
+
+def _writing_prompt(question: str, essay: str, note: str = "", task: int = 2) -> str:
+    """Task 1/2 批改的完整 prompt(生产与 tools/measure_ielts_tokens.py 共用一处)。
+
+    Task 1 的 TR 指 Task Achievement;分数键名保持 TR,前端按题型换标签。
+    """
+    task = task if task in (1, 2) else 2
+    tr_note = ("Task 1 的 TR 指 Task Achievement:是否概括关键特征、数据引用是否准确、"
+               "有没有臆测图表之外的内容。\n") if task == 1 else ""
     head = (
         "直接输出批改结果,不要复述下面的要求。\n"
         "**第一行必须严格是这个格式,不要加别的内容**:\n"
         "SCORES: TR=6.5|CC=6.0|LR=6.5|GRA=6.0|OA=6.0\n"
         "(按官方量表实事求是地打分,0-9 可用 .5;OA 取四项平均后按雅思规则到 .5;\n"
         " 不要照抄示例数字,那是格式示例)\n"
+        + tr_note +
         "空一行后分三节,每节都尽量精简:\n"
         "【主要问题】最多 3 条,每条一两句话,引用作文原句指出问题\n"
         "【改进建议】最多 3 条,给出可直接替换的表达\n"
         "【提升到 7 分还差什么】一句话\n\n"
     )
-    tail = (f"题目:\n{(question or 'Some people believe that... (题目未提供,按一般议论文评)').strip()}\n\n"
+    tail = (f"题目:\n{(question or _WRITING_FALLBACK_TOPIC[task]).strip()}\n\n"
             f"作文:\n{essay.strip()[:6000]}")
-    return ("请按雅思官方评分标准批改下面这篇 Writing Task 2 作文。\n"
+    return (f"请按雅思官方评分标准批改下面这篇 Writing Task {task} 作文。\n"
             + "\n".join(_ECONOMY_RULES) + "\n\n" + head + note + tail)
 
 
-def ielts_writing_feedback(question: str, essay: str) -> dict:
-    """Task 2 批改:按 TR/CC/LR/GRA 四项打分 + 总分 + 中文改进建议。
+def ielts_writing_feedback(question: str, essay: str, task: int = 2) -> dict:
+    """Task 1/2 批改:按 TR/CC/LR/GRA 四项打分 + 总分 + 中文改进建议。
 
     分数单独一行输出,由 _split_scores 解析出来供前端渲染成分数卡。单次调用不设
     人为上限(见 MAX_OUTPUT_TOKENS):模型思考也要吃 tokens,预算给得比思考量还小
@@ -369,7 +382,7 @@ def ielts_writing_feedback(question: str, essay: str) -> dict:
             "\n注意:上一次的第一行不是 SCORES 那一行。请让**第一行**就是 "
             "SCORES: TR=...|CC=...|LR=...|GRA=...|OA=... ,然后才是三节建议。")
         info = _ielts_chat(
-            [{"role": "user", "content": _writing_prompt(question, essay, note)}],
+            [{"role": "user", "content": _writing_prompt(question, essay, note, task)}],
             max_tokens=MAX_OUTPUT_TOKENS, reasoning_fallback=False)
         if not info.get("ok") or info.get("refused"):
             return info
