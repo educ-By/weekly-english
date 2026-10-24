@@ -41,6 +41,12 @@
         {{ article.stats.sentences }} sentences ·
         {{ (article.stats.coverage_b2 * 100) | round(0, 'floor') }}% B2 coverage
       </p>
+      <p class="src-attribution">
+        Originally published at
+        {% if article.url %}<a href="{{ article.url | e }}" target="_blank" rel="noopener noreferrer">{{ article.source }}</a>{% else %}{{ article.source }}{% endif %}.
+        Reproduced for non-commercial educational use only; all rights belong to the
+        original author and publisher.
+      </p>
     </div>
 
     <div class="entry-tools">

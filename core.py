@@ -46,7 +46,7 @@ RENDER_MIGRATE_VERSION = 1
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
     "app.js": 50,
-    "style.css": 41,
+    "style.css": 42,
     "me.js": 5,
     "auth.js": 1,
     "ielts.js": 5,
@@ -1259,6 +1259,12 @@ def write_index_landing(out_dir: Path, issues: list[dict]) -> None:
         pieces=sum(i["count"] for i in archive_issues),
     )
     (out_dir / "archive.html").write_text(archive_html, encoding="utf-8")
+
+    copyright_html = _env.get_template("copyright.html.j2").render(
+        page="legal", nav="legal",
+        contact_email=os.environ.get("CONTACT_EMAIL", ""),
+    )
+    (out_dir / "copyright.html").write_text(copyright_html, encoding="utf-8")
 
 
 _JUNK_PATTERNS = [

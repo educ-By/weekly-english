@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Copyright &amp; Takedown · Weekly English</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}" />
+</head>
+<body data-page="legal">
+
+{% include "_masthead.html.j2" %}
+
+<main class="wrap">
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">Copyright &amp; Takedown</span>
+  </nav>
+
+  <section class="cover cover-compact">
+    <div class="cover-kicker">Legal · 版权说明</div>
+    <h1 class="cover-title">Copyright &amp; Takedown</h1>
+  </section>
+
+  <article class="entry legal-entry">
+    <h2>What this site is</h2>
+    <p>
+      Weekly English is a personal, non-commercial study project. It collects publicly
+      available English news and essays (via the publishers' own RSS feeds and public
+      web pages), grades them by CEFR difficulty, and highlights out-of-scope vocabulary
+      to help learners read. It carries no advertising and charges no fees.
+    </p>
+
+    <h2>Content ownership</h2>
+    <p>
+      All articles remain the property of their original authors and publishers.
+      Every article page states where it was originally published and links back to
+      the source. This site asserts no claim over that content and reproduces it
+      solely for non-commercial educational purposes.
+    </p>
+
+    <h2>版权声明</h2>
+    <p>
+      本站为个人非商业性质的学习项目，所有英文文章均来自各刊物的公开 RSS 订阅源或公开网页，
+      仅作英语教学交流之用，不作任何商业用途。文章版权归原作者及原出版机构所有，
+      本站不主张任何权利。如权利人认为本站的内容侵犯其合法权益，请按下方方式联系我们，
+      经核实后会在 48 小时内删除相关内容或停止转载。
+    </p>
+
+    <h2>Takedown / removal requests</h2>
+    <p>
+      If you are a rights holder (or an agent) and want your content removed, send the
+      article URL on this site (e.g. <code>/issue/2026-W43/article-xxxx.html</code>) to
+      {% if contact_email %}<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.
+      {% else %}the maintainer via the project repository's issue tracker.{% endif %}
+      We will remove the material — usually within 48 hours — and can also exclude the
+      entire publication from future collections on request.
+    </p>
+  </article>
+
+</main>
+
+{% include "_footer.html.j2" %}
+
+<script src="{{ asset('app.js') }}"></script>
+</body>
+</html>
