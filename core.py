@@ -1417,6 +1417,61 @@ def _filter_junk(records: list[dict]) -> list[dict]:
     return out
 
 
+def _norm_title(t: str) -> str:
+    """跨 URL 判同文用的标题规范化:小写 + 只留字母数字。"""
+    return re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
+
+
+def _published_keys(out_dir: Path) -> tuple[set[str], set[str]]:
+    """已刊文章的 (id 集, 规范化标题 集),从历史期产物回收,不引入额外状态文件。
+
+    id 直接取 article-<id>.html 文件名 —— meta.json 缺失的历史期也能覆盖;
+    标题取 meta.json 里的 articles,兜住"同文不同 URL"(重发/换链接)的情况。
+    当期目录排除:同一周内重复刷新时,当期自身不能算"已刊",否则整期被清空。
+    """
+    ids: set[str] = set()
+    titles: set[str] = set()
+    if not out_dir.exists():
+        return ids, titles
+    current = issue_key()
+    issue_dir_re = re.compile(r"\d{4}-W\d{2}$")
+    for p in out_dir.iterdir():
+        if not (p.is_dir() and issue_dir_re.match(p.name)) or p.name == current:
+            continue
+        for f in p.glob("article-*.html"):
+            ids.add(f.stem[len("article-"):])
+        meta = p / "meta.json"
+        if meta.exists():
+            try:
+                for a in (json.loads(meta.read_text(encoding="utf-8"))
+                          .get("articles") or []):
+                    t = _norm_title(a.get("title") or "")
+                    if t:
+                        titles.add(t)
+            except Exception as e:
+                log.warning("Bad meta.json for %s: %s", p.name, e)
+    return ids, titles
+
+
+def _drop_published(records: list[dict], out_dir: Path) -> list[dict]:
+    """跨周查重:同一篇文章(同 URL,或同标题换链)不上第二次。"""
+    seen_ids, seen_titles = _published_keys(out_dir)
+    if not seen_ids and not seen_titles:
+        return records
+    out: list[dict] = []
+    dropped: list[str] = []
+    for r in records:
+        t = _norm_title(r.get("title") or "")
+        if r.get("id") in seen_ids or (t and t in seen_titles):
+            dropped.append(f'{r.get("source", "")}:{(r.get("title") or "")[:60]}')
+            continue
+        out.append(r)
+    if dropped:
+        log.info("Dropped %d already-published article(s), e.g. %s",
+                 len(dropped), " | ".join(dropped[:5]))
+    return out
+
+
 def _dedupe_same_story(records: list[dict]) -> list[dict]:
     """同一故事的分级重复(如同一来源的 level 1/2/3 变体)只留正文最长的一篇。"""
     import hashlib
@@ -1487,7 +1542,8 @@ def _apply_zh_summaries(articles: list[dict]) -> None:
 
 
 def prepare_summary_batch(config: dict | None = None,
-                          max_articles: int = 60) -> dict:
+                          max_articles: int = 60,
+                          out_dir: Path | None = None) -> dict:
     """周一晚:真实收集候选文章,把缺简介的用 8 线程预生成,直接写 article_summary。
 
     DeepSeek 官方没有 Batch API(其 /files 只服务聊天文件上传),所以"批量"
@@ -1502,7 +1558,7 @@ def prepare_summary_batch(config: dict | None = None,
         log.info("summary prepare skipped: LLM not configured")
         return out
     try:
-        candidates = collect_candidates(config, max_articles)
+        candidates = collect_candidates(config, max_articles, out_dir=out_dir)
     except Exception as e:
         log.warning("summary prepare collect failed: %s", e)
         return out
@@ -1567,15 +1623,19 @@ def _interleave_by_source(records: list[dict]) -> list[dict]:
 
 
 def collect_candidates(config: dict | None = None,
-                       max_articles: int = 60) -> list[dict]:
-    """收集管线:抓取 → 过滤 → 去重 → 按源穿插 → 截断。只收集,不分级不渲染。
+                       max_articles: int = 60,
+                       out_dir: Path | None = None) -> list[dict]:
+    """收集管线:抓取 → 过滤 → 跨周查重 → 去重 → 按源穿插 → 截断。只收集,不分级不渲染。
 
     full_refresh(周二早上正式出刊)和周一晚的批量简介预生成共用这一条管线,
     保证"提前预生成的那批文章"和"最终进刊的这批"是同一批口径筛出来的。
+    传 out_dir 时启用跨周查重(同一篇文章不上第二次)。
     """
     cfg = config or {}
     raw = collect(cfg)
     raw = _filter_junk(raw)
+    if out_dir is not None:
+        raw = _drop_published(raw, out_dir)
     raw = _dedupe_same_story(raw)
     raw = _interleave_by_source(raw)
     return raw[:max_articles]
@@ -1588,7 +1648,7 @@ def full_refresh(out_dir: Path,
     一次完整刷新:抓取 → 分级 → 渲染到 out_dir/<issue_key>/ → 更新主页与 archive。
     返回最新一期路径信息。
     """
-    raw = collect_candidates(config, max_articles)
+    raw = collect_candidates(config, max_articles, out_dir=out_dir)
     log.info("Refresh collected %d articles", len(raw))
     if not raw:
         return {"ok": False, "reason": "no articles"}

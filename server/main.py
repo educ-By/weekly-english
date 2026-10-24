@@ -1363,7 +1363,7 @@ def _scheduled_refresh():
 # "批量"实为出刊前的内联并发预生成,直接写缓存库。)
 def _prepare_batch_job():
     try:
-        result = core.prepare_summary_batch()
+        result = core.prepare_summary_batch(out_dir=OUT_DIR)
         log.info("Summary pre-generation done: %s", result)
     except Exception as e:
         log.warning("Summary pre-generation failed: %s", e)
