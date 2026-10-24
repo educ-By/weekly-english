@@ -299,8 +299,9 @@ BBC Learning English*
   版权归属,并链接到版权页 `/copyright.html`(中英双语,含下架流程)。
 - **下架流程**:权利人发来文章 URL 即删除(通常 48 小时内),也可整刊停抓。
   联系邮箱用环境变量 `CONTACT_EMAIL` 配置;未配置时版权页展示仓库 issue 入口。
-- **存量页面**:旧期没有存原始 JSON,无法重渲染 — 用
-  `python tools/patch_copyright.py` 对已落盘 HTML 就地补署名/页脚/版权页(幂等)。
+- **存量页面**:旧期没有存原始 JSON,无法重渲染 — 启动时的渲染迁移
+  (`migrate_rendered_data`,版本 2)会自动就地补署名/页脚/版权页(带备份、幂等);
+  也可手动 `python tools/patch_copyright.py` 立即补一遍。
 
 ## License
 

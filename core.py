@@ -38,7 +38,7 @@ BACKUP_DIR_NAME = "backup"
 BACKUP_KEEP = 3
 
 # 渲染产物的就地迁移版本 —— 改一次迁移逻辑就 +1,老卷上会重新跑一遍
-RENDER_MIGRATE_VERSION = 1
+RENDER_MIGRATE_VERSION = 2
 
 # 静态资源版本号 —— static/ 下哪个文件改了就把对应数字 +1。
 # 页面是预渲染到磁盘的死 HTML,模板改了不会自动影响已经落盘的成品,
@@ -778,6 +778,97 @@ def migrate_rendered_pages(out_dir: Path) -> int:
     return changed
 
 
+# ---- 版权补丁:给存量页面就地补署名 / 页脚声明 / Legal 链接 ----
+# 模板只影响之后渲染的期;磁盘上已有的老期没有存原始 JSON,只能字符串级补。
+# 幂等,可反复跑;tools/patch_copyright.py 是它的命令行入口。
+
+_OLD_FOOT_ABOUT = (
+    "Hand-picked English reading, graded B1–C1. Originals preserved verbatim; "
+    "out-of-scope words are marked against the 3,500-word gaokao list and its inflections."
+)
+_NEW_FOOT_ABOUT = (
+    "Hand-picked English reading, graded B1–C1. Articles are reproduced from their "
+    "original publishers for non-commercial educational use only; copyright belongs "
+    "to the original authors and publishers. Out-of-scope words are marked against "
+    "the 3,500-word gaokao list and its inflections."
+)
+# 多页改造前的老页脚是双 span 形态
+_OLD_FOOT_SPAN = "<span>Originals preserved verbatim.</span>"
+_NEW_FOOT_SPAN = (
+    '<span class="foot-legal">Articles are reproduced for non-commercial educational '
+    'use only; copyright belongs to the original authors and publishers. '
+    '<a href="/copyright.html">Copyright &amp; takedown</a></span>'
+)
+
+# 存量文章页的来源标签:新模板是 <a class="src" href="URL">,更老的是纯 span
+_SRC_A_RE = re.compile(r'<a class="src" href="([^"]+)"[^>]*>([^<]*)</a>')
+_SRC_SPAN_RE = re.compile(r'<span class="src">([^<]*)</span>')
+_ATTR_P_RE = re.compile(r'<p class="src-attribution">.*?</p>', re.S)
+
+_ATTR_WITH_URL = (
+    '<p class="src-attribution">Originally published at '
+    '<a href="{url}" target="_blank" rel="noopener noreferrer">{source}</a>. '
+    "Reproduced for non-commercial educational use only; all rights belong to the "
+    "original author and publisher.</p>"
+)
+_ATTR_NO_URL = (
+    '<p class="src-attribution">Originally published in {source}. '
+    "Reproduced for non-commercial educational use only; all rights belong to the "
+    "original author and publisher.</p>"
+)
+
+
+def _inject_footer_legal_link(html: str) -> str:
+    """在 <footer> 的 Browse 列 Archive 链接后补一条 Copyright & takedown(幂等)。"""
+    i = html.find('<footer class="foot">')
+    if i < 0 or 'href="/copyright.html"' in html[i:]:
+        return html
+    foot = html[i:].replace(
+        '<a href="/archive">Archive</a>',
+        '<a href="/archive">Archive</a>\n      '
+        '<a href="/copyright.html">Copyright &amp; takedown</a>',
+        1,
+    )
+    return html[:i] + foot
+
+
+def _patch_copyright_article(html: str) -> str:
+    html = _ATTR_P_RE.sub("", html)  # 剥掉旧跑插入的署名段,按当前规则重插
+    m = _SRC_A_RE.search(html) or _SRC_SPAN_RE.search(html)
+    if m:
+        attr = (_ATTR_WITH_URL.format(url=m.group(1), source=m.group(2))
+                if m.lastindex == 2 else _ATTR_NO_URL.format(source=m.group(1)))
+        html = html.replace('<p class="stats">', attr + '<p class="stats">', 1)
+    return html
+
+
+def apply_copyright_patch(out_dir: Path) -> int:
+    """给已渲染的存量页面补版权署名与页脚声明,返回改动的文件数。
+
+    只处理各期目录下的页面;根目录的 index/archive/copyright 由
+    write_index_landing 重渲染,天然带最新页脚,不需要补。
+    """
+    real = rendered_dir(out_dir)
+    if not real.is_dir():
+        return 0
+    changed = 0
+    for f in real.rglob("*.html"):
+        if f.parent == real or not re.match(r"\d{4}-W\d{2}$", f.parent.name):
+            continue
+        html = orig = f.read_text(encoding="utf-8")
+        if f.name.startswith("article-"):
+            html = _patch_copyright_article(html)
+        html = html.replace(_OLD_FOOT_ABOUT, _NEW_FOOT_ABOUT)
+        html = html.replace(_OLD_FOOT_SPAN, _NEW_FOOT_SPAN)
+        html = _inject_footer_legal_link(html)
+        if html != orig:
+            f.write_text(html, encoding="utf-8")
+            changed += 1
+    if changed:
+        log.info("Copyright patch applied to %d legacy pages", changed)
+    return changed
+
+
 def migrate_rendered_data(out_dir: Path) -> dict:
     """启动时的一次性整理:先备份,再抽语料 + 就地更新老页面,最后重建 catalog。
 
@@ -799,6 +890,7 @@ def migrate_rendered_data(out_dir: Path) -> dict:
 
     out["corpus"] = extract_search_corpus(out_dir)
     out["pages"] = migrate_rendered_pages(out_dir)
+    out["copyright"] = apply_copyright_patch(out_dir)
     if out["corpus"]:
         try:
             build_catalog(out_dir)
