@@ -296,6 +296,19 @@ def archive(request: Request):
     return _html_response(path, request)
 
 
+@app.get("/copyright", response_class=HTMLResponse)
+@app.get("/copyright.html", response_class=HTMLResponse)
+def copyright_page(request: Request):
+    """版权/下架页 —— 存量卷上没有这个文件时就地补渲染(页脚链接指向它)。"""
+    path = OUT_DIR / "copyright.html"
+    if not path.exists():
+        issues = core.scan_issues(OUT_DIR)
+        core.write_index_landing(OUT_DIR, issues)
+    if not path.exists():
+        raise HTTPException(404, "Not Found")
+    return _html_response(path, request)
+
+
 @app.get("/issue/latest")
 def issue_latest():
     """/issue/latest → 重定向到当前最新一期。
