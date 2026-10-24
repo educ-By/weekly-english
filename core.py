@@ -46,7 +46,7 @@ RENDER_MIGRATE_VERSION = 2
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
     "app.js": 50,
-    "style.css": 42,
+    "style.css": 43,
     "me.js": 5,
     "auth.js": 1,
     "ielts.js": 5,
@@ -525,6 +525,24 @@ def issue_title(articles: list[dict]) -> str:
     if "Reader's Digest" in sources:
         return "Small habits, longer essays."
     return "A week of reading, hand-picked."
+
+
+# issue_title() 的兜底句们 —— 每期都一样,archive 里连排六条一模一样很傻。
+# 标题命中它们时,列表行改显示该期"锚定文章"(最长一篇)的标题(见 lead_line)。
+_GENERIC_ISSUE_TITLES = {"", "A week of reading, hand-picked.", "A quieter week of reading."}
+
+
+def lead_line(articles: list[dict]) -> str:
+    """期列表展示行:取该期最长一篇文章的标题,超长截断。"""
+    best = max(
+        (a for a in articles if (a.get("title") or "").strip()),
+        key=lambda a: a.get("words") or 0,
+        default=None,
+    )
+    if not best:
+        return ""
+    t = " ".join(best["title"].split())
+    return (t[:90] + "…") if len(t) > 90 else t
 
 
 def build_article(rec: dict) -> dict:
@@ -1055,6 +1073,16 @@ def scan_issues(out_dir: Path) -> list[dict]:
         if not idx.exists():
             continue
         title = _issue_title(p)
+        lead = ""
+        if title in _GENERIC_ISSUE_TITLES:
+            meta_path = p / "meta.json"
+            if meta_path.exists():
+                try:
+                    lead = lead_line(
+                        json.loads(meta_path.read_text(encoding="utf-8"))
+                        .get("articles") or [])
+                except Exception:
+                    lead = ""
         articles_count = len(list(p.glob("article-*.html")))
         iso = p.name.split("-W")
         number = int(iso[1]) if len(iso) == 2 else 0
@@ -1065,6 +1093,7 @@ def scan_issues(out_dir: Path) -> list[dict]:
             "week": f"W{iso[1]}" if len(iso) == 2 else "",
             "week_label": f"{iso[0]} · W{iso[1]}",
             "title": title,
+            "lead": lead,
             "count": articles_count,
             "number": number,
         })
@@ -1262,6 +1291,8 @@ def build_catalog(out_dir: Path) -> list[dict]:
             "week_label": it["week_label"],
             "year": it.get("year", ""),
             "title": it["title"],
+            "lead": ("" if it["title"] not in _GENERIC_ISSUE_TITLES
+                     else lead_line(articles)),
             "number": it["number"],
             "count": len(articles),
             "articles": articles,

@@ -1308,6 +1308,7 @@ def _background_refresh_once():
     # 3) catalog.json 缺失(旧卷)、刚迁移过、刚补进历史期、或首页还缺雅思入口卡 ——
     #    重建首页 / archive / 跨期索引(纯离线重渲染,不联网不烧 token)
     home_lacks_ielts = False
+    archive_needs_lead = False
     try:
         home_path = OUT_DIR / "index.html"
         # 判定必须是入口卡独有的 id:导航里的 href="/ielts" 由 refresh_nav_links
@@ -1315,9 +1316,16 @@ def _background_refresh_once():
         home_lacks_ielts = (home_path.exists()
                             and 'id="home-ielts"' not in
                             home_path.read_text(encoding="utf-8"))
+        # archive 行改用 lead(锚定文章标题)代替重复的兜底期标题 —— 老渲染产物没有
+        # 这个标记,就地重建一次 landing
+        arch_path = OUT_DIR / "archive.html"
+        archive_needs_lead = (arch_path.exists()
+                              and 'data-lead' not in
+                              arch_path.read_text(encoding="utf-8"))
     except Exception:
         home_lacks_ielts = False
     if rebuilt or _seeded_issue_count or home_lacks_ielts \
+            or archive_needs_lead \
             or not (OUT_DIR / "catalog.json").exists():
         try:
             issues = core.scan_issues(OUT_DIR)

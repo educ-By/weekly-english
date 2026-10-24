@@ -1385,3 +1385,11 @@ a.vocab-word:hover { color: var(--c-rare); }
   background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 4px;
   font-size: 0.9em;
 }
+
+/* ---- archive 行:lead 标题过长时单行省略,不撑破网格 ---- */
+.archive-row .archive-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
