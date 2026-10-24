@@ -46,7 +46,7 @@ RENDER_MIGRATE_VERSION = 2
 # 会一直命中浏览器缓存里的旧 JS/CSS,改动根本到不了他们那里。
 ASSET_VERSIONS: dict[str, int] = {
     "app.js": 50,
-    "style.css": 43,
+    "style.css": 44,
     "me.js": 5,
     "auth.js": 1,
     "ielts.js": 5,
@@ -346,19 +346,19 @@ DEFAULT_RSS_SOURCES = [
     # ---- 新闻(国内直连可达) ----
     {"name": "NPR News",
      "feed": "https://feeds.npr.org/1001/rss.xml",
-     "limit": 2, "full_text": True},
+     "limit": 2, "full_text": True, "excerpt": 2},
     {"name": "NPR Topics: Education",
      "feed": "https://feeds.npr.org/1032/rss.xml",
-     "limit": 2, "full_text": True},
+     "limit": 2, "full_text": True, "excerpt": 2},
     {"name": "NPR Science",
      "feed": "https://feeds.npr.org/1007/rss.xml",
-     "limit": 2, "full_text": True},
+     "limit": 2, "full_text": True, "excerpt": 2},
     {"name": "NPR Health",
      "feed": "https://feeds.npr.org/1008/rss.xml",
-     "limit": 2, "full_text": True},
+     "limit": 2, "full_text": True, "excerpt": 2},
     {"name": "NPR Politics",
      "feed": "https://feeds.npr.org/1015/rss.xml",
-     "limit": 2, "full_text": True},
+     "limit": 2, "full_text": True, "excerpt": 2},
     {"name": "CBS News",
      "feed": "https://www.cbsnews.com/latest/rss/main",
      "limit": 2, "full_text": True},
@@ -399,7 +399,7 @@ DEFAULT_RSS_SOURCES = [
      "limit": 3, "full_text": True},
     {"name": "Nature News",
      "feed": "https://www.nature.com/nature.rss",
-     "limit": 3, "full_text": True},
+     "limit": 3, "full_text": True, "excerpt": 2},
     {"name": "ScienceDaily",
      "feed": "https://www.sciencedaily.com/rss/all.xml",
      "limit": 2, "full_text": True},
@@ -422,13 +422,29 @@ DEFAULT_RSS_SOURCES = [
     # ---- 文化 / 长文 ----
     {"name": "Smithsonian Magazine",
      "feed": "https://www.smithsonianmag.com/rss/articles/",
-     "limit": 2, "full_text": True},
+     "limit": 2, "full_text": True, "excerpt": 2},
     {"name": "Smithsonian History",
      "feed": "https://www.smithsonianmag.com/rss/history/",
-     "limit": 2, "full_text": True},
+     "limit": 2, "full_text": True, "excerpt": 2},
     {"name": "Aeon",
      "feed": "https://aeon.co/feed.rss",
      "limit": 2, "full_text": True},
+
+    # ---- 教育 / 学习科学 ----
+    # The Conversation:CC BY-ND,官方允许非商业原样转载(须署名+回链,均已满足)。
+    # 本机(国内网络)连不上 theconversation.com,东京节点可达性待线上验证;失败自动跳过。
+    {"name": "The Conversation",
+     "feed": "https://theconversation.com/us/education/rss",
+     "limit": 2, "full_text": True},
+    # Quanta:数学/物理/CS 顶级科普。About 页只提 syndication 未公开 CC 条款,保守给节选。
+    {"name": "Quanta Magazine",
+     "feed": "https://api.quantamagazine.org/feed/",
+     "limit": 2, "full_text": True, "excerpt": 2},
+    # (Hechinger Report 曾试用:feed 可读但文章页有 JS 浏览器挑战,服务端拿不到正文,弃。)
+    # Science News Explores:专为中学生写的科学新闻(B1/B2 向),未声明转载许可,给节选。
+    {"name": "Science News Explores",
+     "feed": "https://www.snexplores.org/feed",
+     "limit": 3, "full_text": True, "excerpt": 2},
 
     # ---- B1 入门级(专为英语学习者写的分级新闻) ----
     {"name": "Breaking News English",
@@ -576,6 +592,7 @@ def build_article(rec: dict) -> dict:
         "summary_paragraphs": safe_paragraphs(summary, max_paragraphs=3),
         "body_paragraphs": safe_paragraphs(body, max_paragraphs=12),
         "body_search": re.sub(r"<[^>]+>", " ", body).lower(),
+        "excerpt": bool(rec.get("excerpt")),
     }
 
 
@@ -1641,6 +1658,35 @@ def collect_candidates(config: dict | None = None,
     return raw[:max_articles]
 
 
+def _excerpt_limits(config: dict) -> dict[str, int]:
+    """源名 → 节选段数。取自当前生效的源配置(rss + html)。"""
+    limits: dict[str, int] = {}
+    for src in (config.get("rss") or DEFAULT_RSS_SOURCES) + (config.get("html") or DEFAULT_HTML_SOURCES):
+        if src.get("excerpt"):
+            limits[src["name"]] = int(src["excerpt"])
+    return limits
+
+
+def _apply_excerpt(records: list[dict], config: dict) -> None:
+    """按源把正文截到前 N 段(就地改),并打 excerpt 标记供模板显示"阅读原文"。
+
+    在记录层截断 —— 分级/统计/超纲词/AI 上下文都以截断后的文本为准,与展示一致。
+    """
+    limits = _excerpt_limits(config)
+    if not limits:
+        return
+    for r in records:
+        n = limits.get(r.get("source") or "")
+        body = r.get("body") or ""
+        if not n or not body:
+            continue
+        paras = [p for p in re.split(r"\n\s*\n", body) if p.strip()]
+        if len(paras) <= n:
+            continue
+        r["body"] = "\n\n".join(paras[:n]).strip()
+        r["excerpt"] = True
+
+
 def full_refresh(out_dir: Path,
                  config: dict | None = None,
                  max_articles: int = 60) -> dict:
@@ -1649,6 +1695,7 @@ def full_refresh(out_dir: Path,
     返回最新一期路径信息。
     """
     raw = collect_candidates(config, max_articles, out_dir=out_dir)
+    _apply_excerpt(raw, config or {})
     log.info("Refresh collected %d articles", len(raw))
     if not raw:
         return {"ok": False, "reason": "no articles"}

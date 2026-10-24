@@ -1393,3 +1393,14 @@ a.vocab-word:hover { color: var(--c-rare); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---- 节选模式:"阅读原文"提示行 ---- */
+.excerpt-note {
+  margin: 18px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--accent, #4a5fc1);
+  background: rgba(0,0,0,.03);
+  font-size: 14px;
+  color: var(--muted, #6b6f78);
+}
+.excerpt-note a { color: var(--accent, #4a5fc1); text-decoration: underline; }

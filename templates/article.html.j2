@@ -87,6 +87,13 @@
       {% endfor %}
     </div>
 
+    {% if article.excerpt and article.url %}
+    <p class="excerpt-note">
+      This is the opening of the article — read the full piece at
+      <a href="{{ article.url | e }}" target="_blank" rel="noopener noreferrer">{{ article.source }} →</a>
+    </p>
+    {% endif %}
+
     <details class="rare-words">
       <summary>Out-of-scope vocabulary · {{ article.rare_words|length }} words</summary>
       <p class="rare-help">
